@@ -1,0 +1,154 @@
+body {
+    margin: 0 auto;
+    background: rgb(241, 244, 249)
+}
+.head_c {
+    width: 100%;
+    height: 200px;
+    text-align: center;
+    background: rgb(255, 227, 0);
+}
+.head_c div {
+    margin: 0 20px 0 20px;
+}
+.head_c div h1 {
+    padding-top: 40px;
+    color: #333333;
+    font-size: 36px;
+    font-weight: bold;
+}
+.head_c div select {
+    cursor: pointer;
+    text-align: center;
+    width: auto;
+    height: 38px;
+    padding: 0 20px;
+    margin: 0;
+    border: none;
+    position: relative;
+    right: 260px;
+    top: 37px;
+    background-color: transparent;
+}
+.head_c div select:focus {
+    outline: none;
+}
+.head_c div select option {
+    height: 20px;
+}
+.head_c div form {
+    width: 100%;
+    height: 42px;
+}
+.head_c div form input {
+    border: hidden;
+    border-radius: 10px;
+    width: 620px;
+    height: 38px;
+    text-indent: 110px;
+    outline:none;
+    box-shadow: 0px 0px 6px rgba(0,0,0,0.05);
+    /* padding: 0 46px 0 110px; */
+}
+.head_c div form input:focus {
+    box-shadow: 0px 0px 1px 2px rgba(0,0,0,1);
+}
+.head_c div form button {
+    cursor: pointer;
+    display: block;
+    margin: auto;
+    height: 26px;
+    width: 26px;
+    background-image: url(../image/搜索.svg);
+    background-color: transparent;
+    border: none;
+    position: relative;
+    left: 283px;
+    bottom: 32px;
+}
+.body_b div{
+    width: 100%;
+    height: 48px;
+    background: rgb(255, 227, 0);
+}
+.body_b div div{
+    width: 100%;
+    height: 48px;
+    border-top-left-radius: 100%;
+    border-top-right-radius: 100%;
+    background: rgb(255, 255, 255);
+    box-shadow: 0px 0px 6px rgba(0,0,0,0.05); 
+}
+.body_c {
+    margin: 0px 20px 0 20px;
+}
+.body_c div {
+    border-radius: 10px;
+    margin: 24px 0;
+    /* padding: 20px; */
+    width: 100%;
+    background-color: rgb(255, 255, 255);
+    box-shadow: 0px 0px 6px rgba(0,0,0,0.05);
+}
+.body_c div h2 {
+    padding: 13px 36px;
+    border-bottom: 1px solid #f1f4f9;
+    line-height: 16px
+}
+.body_c div ul {
+    padding: 22px 15px;
+}
+.body_c div ul li {
+    float: left;
+    width: 12.5%;
+}
+.body_c div ul li a {
+    display: block;
+    width: 100%;
+    padding: 14px 14px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    
+}
+.body_c div ul li a:hover {
+    background-color: rgb(253, 251, 242);
+}
+.body_c div ul li a img {
+    float: left;
+    width: 26px;
+    height: 26px;
+    border-radius: 100%;
+}
+.body_c div ul li a h3 {
+    margin-left: 32px;
+    color: #3c3c3c;
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+    height: 21px;
+    line-height: 21px;
+    margin-bottom: 4px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.body_c div ul li a p {
+    margin-left: 32px;
+    color: #8f8f8f;
+    font-size: 12px;
+    height: 3em;
+    line-height: 1.5em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.body_c div ul p {
+    clear:both
+}
+.foot_c {
+    width: 100%;
+    height: 160px;
+    background-color: rgb(241, 244, 249);
+}
