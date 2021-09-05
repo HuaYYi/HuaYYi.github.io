@@ -19,21 +19,20 @@ body {
 }
 .head_c div select {
     cursor: pointer;
-    text-align: center;
-    width: auto;
+    width: 70px;
     height: 38px;
-    padding: 0 20px;
     margin: 0;
     border: none;
     position: relative;
-    right: 260px;
-    top: 37px;
+    right: 318px;
+    top: 43px;
     background-color: transparent;
 }
 .head_c div select:focus {
     outline: none;
 }
 .head_c div select option {
+    text-align:center;
     height: 20px;
 }
 .head_c div form {
@@ -43,8 +42,8 @@ body {
 .head_c div form input {
     border: hidden;
     border-radius: 10px;
-    width: 620px;
-    height: 38px;
+    width: 740px;
+    height: 48px;
     text-indent: 110px;
     outline:none;
     box-shadow: 0px 0px 6px rgba(0,0,0,0.05);
@@ -63,8 +62,8 @@ body {
     background-color: transparent;
     border: none;
     position: relative;
-    left: 283px;
-    bottom: 32px;
+    left: 340px;
+    bottom: 36px;
 }
 .body_b div{
     width: 100%;

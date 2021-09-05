@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div id="d">
+        <span id="s">
+          1234567890
+        </span>
+        </div>
+    <script type="text/javascript">
+        //首先找到Id为d的元素
+        var d=document.getElementById('d');
+        //创建一个节点
+        var a=document.createElement('a');
+        //设置a的属性
+        a.href='https://www.baidu.com/';
+        a.innerText='ggggg';
+        //添加元素  将创建的节点添加到Id为d的div里
+        d.appendChild(a);
+        //在指定节点前插入新节点
+        var p=document.createElement('p');
+        //添加文本内容
+        p.innerText='ppppppppppppppppp';
+        //d.appendChild(p);
+        //参数1：要添加的元素 参数2：要放到哪个节点的前面
+        d.insertBefore(p,a);
+        //获取目标元素
+        var s=document.getElementById('s');
+        //克隆新元素
+        var spanc= s.cloneNode(true);//默认参数是false
+        d.appendChild(spanc);
+      </script>
+</body>
+</html>

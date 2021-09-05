@@ -1,0 +1,35 @@
+var target_selec =[
+    {
+        action="https://www.baidu.com/s",
+        name="wd",
+        placeholder="百度一下，你就知道",
+        innerText="百度"
+    },
+    {
+        action="https://www.baidu.com/s",
+        name="wd",
+        placeholder="百度一下，你就知道",
+        innerText="搜狗"
+    },
+    {
+        action="https://www.baidu.com/s",
+        name="wd",
+        placeholder="百度一下，你就知道",
+        innerText="360"
+    },
+    {
+        action="https://www.baidu.com/s",
+        name="wd",
+        placeholder="百度一下，你就知道",
+        innerText="花瓣"
+    },
+]
+var target_url =[
+    {
+        kind="常用",
+        href="https://www.iconfont.cn/",
+        img="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png",
+        title="IconFont",
+        describe="国内最著名的图标搜索及管理平台，300万个图标下载"
+    },
+]

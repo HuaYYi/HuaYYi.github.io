@@ -1,12 +1,16 @@
-@media screen and (max-width: 1200px) {
+@media screen and (max-width: 1500px) {
+    .body_c div ul li {width: 16.66666666%;}
+    
+}
+@media screen and (max-width: 1240px) {
     .body_c div ul li {width: 25%;}
-
+}
+@media screen and (max-width: 800px) {
+    .body_c div ul li {width: 33.333333333%;}
+    .head_c div form input {width: 100%;}
+    .head_c div select {float: left;left: 16px;}
+    .head_c div form button {float: right; left: -16px;}
 }
 @media screen and (max-width: 680px) {
     .body_c div ul li {width: 50%;}
-    .head_c div select {float: left;left: 2px;}
-    .head_c div form input {width: 100%;}
-    .head_c div form button {float: right; left: -5px;}
-
-
 }

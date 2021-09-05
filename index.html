@@ -8,12 +8,14 @@
     <link rel="stylesheet" href="source/css/reste.css">
     <link rel="stylesheet" href="source/css/index.css">
     <link rel="stylesheet" href="source/css/response.css">
+    <script src="source/js/index.js"></script>
+    <script src="source/js/target.js"></script>
 </head>
 <body>
     <div class="head_c">
         <div>
             <h1>网址导航</h1>
-            <select onchange="way(this)">
+            <select class="qqq" id="myList" onchange="way(this)">
                 <option value="https://www.baidu.com/s,wd,百度一下，你就知道">百度</option>
                 <option value="https://www.sogou.com/web,query,搜狗搜索">搜狗</option>
                 <option value="https://www.so.com/s,q,360搜索">360</option>
@@ -24,6 +26,11 @@
                 <input id="way_name" type="text" name="wd" placeholder="百度一下，你就知道">
                 <button></button>
             </form>
+
+ 
+
+
+
             
         </div>
     </div>
@@ -32,27 +39,6 @@
         <div>
             <h2>标题</h2>
             <ul>
-                <li>
-                    <a href="https://www.iconfont.cn/" target="_blank">
-                        <img src="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png" alt="IconFont">
-                        <h3>IconFont</h3>
-                        <p>国内最著名的图标搜索及管理平台，300万个图标下载</p>
-                    </a>
-                </li>
-                <li>
-                    <a href="https://www.iconfont.cn/" target="_blank">
-                        <img src="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png" alt="IconFont">
-                        <h3>IconFont</h3>
-                        <p>国内最著名的图标搜索及管理平台，300万个图标下载</p>
-                    </a>
-                </li>
-                <li>
-                    <a href="https://www.iconfont.cn/" target="_blank">
-                        <img src="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png" alt="IconFont">
-                        <h3>IconFont</h3>
-                        <p>国内最著名的图标搜索及管理平台，300万个图标下载</p>
-                    </a>
-                </li>
                 <li>
                     <a href="https://www.iconfont.cn/" target="_blank">
                         <img src="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png" alt="IconFont">
@@ -115,14 +101,4 @@
     </div>
 </body>
 </html>
-<script>
-    function way(way){ 
-        var a = way.options[way.selectedIndex].value;
-        var text= a.split(",") [0];
-        var text1= a.split(",") [1];
-        var text2= a.split(",") [2];
-        document.getElementById("way").action= text;
-        document.getElementById("way_name").name= text1;
-        document.getElementById("way_name").placeholder= text2;
-    }
-</script>
+
