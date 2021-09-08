@@ -5,7 +5,7 @@ for (var i = 0; i < target_url.length; i++){
         sss=true;
         if (tags[k].getAttribute("name") == target_url[i].kind) {
             var li=document.createElement("li")
-            var li_a= li_a = "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + ">" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>"; 
+            var li_a= li_a = "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + " ait='图'>" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>"; 
             li.innerHTML=li_a
             tags[k].insertBefore(li,tags[k].childNodes[0]);
         }

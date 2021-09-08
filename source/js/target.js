@@ -40,6 +40,62 @@ var target_url =[
         describe:"推荐！1000万套原创品质商用素材，效率神器"
     },
     {
+        kind:"设计素材",
+        href:"https://huaban.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-8-2.png",
+        title:"花瓣网",
+        describe:"设计师寻找灵感的必备站点，启发设计灵感"
+    },
+    {
+        kind:"设计素材",
+        href:"https://www.zcool.com.cn/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-2-10.png",
+        title:"站酷",
+        describe:"综合性设计分享网站，原创设计交流平台"
+    },
+    {
+        kind:"设计素材",
+        href:"https://uiiiuiii.com/tool/typeface",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-10-1.png",
+        title:"免费商用字体",
+        describe:"超全！免费可商用中文+英文字体，含应用场景"
+    },
+    {
+        kind:"设计工具",
+        href:"https://www.fococlipping.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2021/08/nav-fococlipping.png",
+        title:"FocoClipping 在线抠图",
+        describe:"强大的在线抠图神器！3秒出图全自动超方便"
+    },
+    {
+        kind:"设计工具",
+        href:"https://color.adobe.com/zh/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-5-1.png",
+        title:"Adobe Color",
+        describe:"网页设计师配色的最佳之选"
+    },
+    {
+        kind:"设计工具",
+        href:"https://uigradients.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-5-4.png",
+        title:"uiGradients",
+        describe:"今年流行的渐变！点击屏幕两侧按钮可选更多色彩"
+    },
+    {
+        kind:"设计工具",
+        href:"https://colordrop.io/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-5-11.png",
+        title:"ColorDrop",
+        describe:"让寻找配色方案成为信手拈来的事情"
+    },
+    {
+        kind:"设计工具",
+        href:"https://js.design/?source=uisdc&plan=rmtj",
+        img:"https://image.uisdc.com/wp-content/uploads/2021/06/nav-js-design.png",
+        title:"即时设计",
+        describe:"推荐！免费专业级UI设计工具，可云端协作的Sketch"
+    },
+    {
         kind:"前端开发",
         href:"https://www.w3school.com.cn/",
         img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-16-4-1.png",
@@ -47,11 +103,45 @@ var target_url =[
         describe:"必备！全球最大的中文Web技术教程"
     },
     {
-        kind:"短视频",
+        kind:"影视媒体",
         href:"https://www.bilibili.com/",
         img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-15-8.png",
         title:"B站",
         describe:"国内知名视频弹幕网站，有最及时的动漫新番"
     },
-    
+    {
+        kind:"影视媒体",
+        href:"https://www.huya.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2020/01/nav2020-huya.png",
+        title:"虎牙",
+        describe:"弹幕式互动直播平台"
+    },
+    {
+        kind:"设计素材",
+        href:"https://www.jamendo.com/start",
+        img:"https://image.uisdc.com/wp-content/uploads/2020/07/sdcnav-jamendo.png",
+        title:"Jamendo Music",
+        describe:"质量很高的免费音乐素材下载平台"
+    },
+    {
+        kind:"设计素材",
+        href:"https://www.bensound.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2020/07/sdcnav-bensound.png",
+        title:"Bensound",
+        describe:"独特有质感的免费背景音乐素材站点"
+    },
+    {
+        kind:"云存储",
+        href:"https://www.aliyundrive.com/sign/in?spm=aliyundrive.index.0.0.2d836020qNsbQk",
+        img:"https://gw.alicdn.com/imgextra/i3/O1CN01aj9rdD1GS0E8io11t_!!6000000000620-73-tps-16-16.ico",
+        title:"阿里云盘",
+        describe:"速度快、不打扰、够安全、易于分享的网盘"
+    },
+    {
+        kind:"云存储",
+        href:"https://www.lanzou.com/",
+        img:"https://www.lanzou.com//favicon.ico",
+        title:"蓝奏云",
+        describe:"来这里，下载无限制，无验证码，畅快淋漓尽致！"
+    },
 ]
