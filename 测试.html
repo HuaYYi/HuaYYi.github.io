@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<ul id="myList"><li>Coffee</li><li>Tea</li></ul>
+
+<p id="demo">请点击按钮向列表插入一个项目。</p>
+
+<button onclick="myFunction()">试一下</button>
+
+<script>
+var list=document.getElementById("myList")
+function myFunction()
+{
+    for (var li =0; li<10; li++) {
+        // var newItem=document.createElement("LI")
+        // var textnode=document.createTextNode("Water")
+        // newItem.appendChild(textnode)
+
+        var newItem = ""
+        newItem = "<li>" + "<a href=" + target_url[i].href + " target='_blank'>" + "<img src=" + "789" + ">" + "<h3>" + "123" + "</h3>" + "<p>" + "456" + "</p>" + "</a>" + "</li>" + "<p>" + "</p>";
+        list.insertBefore(newItem,list.childNodes[0]);
+
+    }
+
+}
+</script>
+
+<p><b>注释：</b><br>首先请创建一个 LI 节点，<br>然后创建一个文本节点，<br>然后向这个 LI 节点追加文本节点。<br>最后在列表中的首个子节点之前插入此 LI 节点。</p>
+
+</body>
+</html>

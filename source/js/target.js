@@ -1,35 +1,57 @@
 var target_selec =[
     {
-        action="https://www.baidu.com/s",
-        name="wd",
-        placeholder="百度一下，你就知道",
-        innerText="百度"
+        action:"https://www.baidu.com/s",
+        name:"wd",
+        placeholder:"百度一下，你就知道",
+        innerText:"百度"
     },
     {
-        action="https://www.baidu.com/s",
-        name="wd",
-        placeholder="百度一下，你就知道",
-        innerText="搜狗"
+        action:"https://www.sogou.com/web",
+        name:"query",
+        placeholder:"搜狗搜索",
+        innerText:"搜狗"
     },
     {
-        action="https://www.baidu.com/s",
-        name="wd",
-        placeholder="百度一下，你就知道",
-        innerText="360"
+        action:"https://www.so.com/s",
+        name:"q",
+        placeholder:"360搜索",
+        innerText:"360"
     },
     {
-        action="https://www.baidu.com/s",
-        name="wd",
-        placeholder="百度一下，你就知道",
-        innerText="花瓣"
+        action:"https://huaban.com/search/",
+        name:"q",
+        placeholder:"搜索你喜欢的",
+        innerText:"花瓣"
     },
 ]
 var target_url =[
     {
-        kind="常用",
-        href="https://www.iconfont.cn/",
-        img="https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png",
-        title="IconFont",
-        describe="国内最著名的图标搜索及管理平台，300万个图标下载"
+        kind:"设计素材",
+        href:"https://www.iconfont.cn/",
+        img:"https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png",
+        title:"IconFont",
+        describe:"国内最著名的图标搜索及管理平台，300万个图标下载"
     },
+    {
+        kind:"设计素材",
+        href:"https://ibaotu.com/guanggao/1-0-0-0-3-1.html?spm=uisdc",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-1-11.png",
+        title:"包图网",
+        describe:"推荐！1000万套原创品质商用素材，效率神器"
+    },
+    {
+        kind:"前端开发",
+        href:"https://www.w3school.com.cn/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-16-4-1.png",
+        title:"w3school在线教程",
+        describe:"必备！全球最大的中文Web技术教程"
+    },
+    {
+        kind:"短视频",
+        href:"https://www.bilibili.com/",
+        img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-15-8.png",
+        title:"B站",
+        describe:"国内知名视频弹幕网站，有最及时的动漫新番"
+    },
+    
 ]
