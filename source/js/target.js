@@ -34,6 +34,13 @@ var target_url =[
     },
     {
         kind:"设计素材",
+        href:"https://iconpark.oceanengine.com/",
+        img:"https://lf1-cdn2-tos.bytegoofy.com/bydesign/iconparksite/logo.svg",
+        title:"IconParK",
+        describe:"这里有你需要的图标，也有属于你的风格，让工作变得更轻松"
+    },
+    {
+        kind:"设计素材",
         href:"https://ibaotu.com/guanggao/1-0-0-0-3-1.html?spm=uisdc",
         img:"https://image.uisdc.com/wp-content/uploads/2018/08/sdcnav-1-11.png",
         title:"包图网",
@@ -115,6 +122,13 @@ var target_url =[
         img:"https://image.uisdc.com/wp-content/uploads/2020/01/nav2020-huya.png",
         title:"虎牙",
         describe:"弹幕式互动直播平台"
+    },
+        {
+        kind:"影视媒体",
+        href:"http://www.ximiyy.com/",
+        img:"http://www.ximiyy.com/favicon.ico",
+        title:"西米影院",
+        describe:"西米影院收集整理最新最新电影,最新电视剧,最新动画片在线观看，致力打造专业在线视频网站."
     },
     {
         kind:"设计素材",
