@@ -1,13 +1,21 @@
 var sss =false
+//外层循环，对target_url进行循环
 for (var i = 0; i < target_url.length; i++){
-    var tags = document.getElementsByTagName("ul");
+    //把html所有的ul标签声明为一个数组
+    var tags = document.getElementsByTagName("ul"); 
+    //内循环对ul数组循环，通过内部判断找出name=指定内容的ul
     for (var k = 0; k < tags.length; k++) {
         sss=true;
         if (tags[k].getAttribute("name") == target_url[i].kind) {
+            //创建一个元素节点li
             var li=document.createElement("li")
-            var li_a= li_a = "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + " ait='图'>" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>"; 
+            //结构组合
+            var li_a= li_a = "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + " ait='图'>" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>";
+            //把结构组合放进li元素里
             li.innerHTML=li_a
+            //把li放进此时的ul里
             tags[k].insertBefore(li,tags[k].childNodes[0]);
+            //终止循环
             break
         }
         else {
@@ -25,65 +33,3 @@ for (var i = 0; i < target_url.length; i++){
         list.appendChild(div);
     } ;
 }
-
-
-
-// var tags = document.getElementsByTagName("ul");
-// var div = "";
-// var li = "";
-// var count = 0;
-// for (var i = 0; i < target_url.length; i++) {
-//     for (var k = 0; k < tags.length; k++) {
-//         if (i < 1) {
-//             div = "<div>" + "<h2>" + target_url[i].kind + "</h2>" + "<ul name=" + target_url[i].kind + ">" + "</ul>" + "</div>";
-//             document.querySelector(".body_c").innerHTML = div;
-
-            
-//         } 
-//         if (tags[k].getAttribute("name") == target_url[i].kind) {
-//             li ="<li>" + "<a href=" + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + ">" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>" + "</li>" + "<p>" + "</p>";
-//             tags[k].innerHTML = li;
-//         }
-        
-//     }
-// }	 
-
-
-// var node=document.createElement("option");
-// // var textnode=document.createTextNode("假百度");
-// node.value="https://www.baidu.com/s,wd,百度一下，你就知道";
-// node.innerText='假百度';
-// // node.appendChild(textnode);
-// document.getElementById("myList").appendChild(node);
-
-
-// var div = "";
-// 	for (var i = 0; i < target_url.length; i++) {
-// 		div += "<div>" + "<h2>" + target_url[i].kind + "</h2>" + "<ul name=" + target_url[i].kind + ">" + "</ul>" + "</div>";        
-// 	};
-//     document.querySelector(".body_c").innerHTML = div;
-
-
-// var tags = document.getElementsByTagName("ul");
-// var li = "";
-// var count = 0;
-// for (var g = 0; g < target_url.length; g++) {
-//     for (var k = 0; k < tags.length; k++) {
-//         if (tags[k].nodeType == 1) {
-//             if (tags[k].getAttribute("name") == target_url[g].kind) {
-//                 li +="<li>" + "<a href=" + target_url[g].href + " target='_blank'>" + "<img src=" + target_url[g].img + ">" + "<h3>" + target_url[g].title + "</h3>" + "<p>" + target_url[g].describe + "</p>" + "</a>" + "</li>" + "<p>" + "</p>";
-//                 tags[k].innerHTML = li;                
-//             }
-//         }
-//     }
-//     console.log(k)
-//     console.log(g)
-// }
-
-
-// var html = "";
-// 	for (var i = 0; i < target_url.length; i++) {      
-// 		html += "<div>" + "<h2>" + target_url[i].kind + "</h2>" + "<ul>" + "<li>" + "<a href=" + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + " alt=" + target_url[i].title + " >" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>" + "</li>" + "<p>" + "</p>" + "</ul>" + "</div>";     
-// 	};
-// 	document.querySelector(".body_c").innerHTML = html;
-
