@@ -158,4 +158,11 @@ var target_url =[
         title:"蓝奏云",
         describe:"来这里，下载无限制，无验证码，畅快淋漓尽致！"
     },
+    {
+        kind:"前端开发",
+        href:"https://www.runoob.com/",
+        img:"https://static.runoob.com/images/favicon.ico",
+        title:"菜鸟教程",
+        describe:"学的不仅是技术，更是梦想！"
+    },
 ]
