@@ -126,7 +126,7 @@ var target_url =[
         {
         kind:"影视媒体",
         href:"http://www.ximiyy.com/",
-        img:"http://www.ximiyy.com/favicon.ico",
+        img:"www.ximiyy.com/favicon.ico",
         title:"西米影院",
         describe:"西米影院收集整理最新最新电影,最新电视剧,最新动画片在线观看，致力打造专业在线视频网站."
     },
