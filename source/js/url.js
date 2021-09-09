@@ -16,7 +16,7 @@ for (var i = 0; i < target_url.length; i++){
     };
     if (!sss) {
         var div=document.createElement("div");
-        var div_n= div_n= "<h2>" + target_url[i].kind + "</h2>" + "<ul name=" + target_url[i].kind + ">" + "<li>" + "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + ">" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>" + "</li>" + "<p>" + "</p>" + "</ul>";
+        var div_n= div_n= "<h2>" + target_url[i].kind + "</h2>" + "<ul name=" + target_url[i].kind + ">" + "<li>" + "<a href= " + target_url[i].href + " target='_blank'>" + "<img src=" + target_url[i].img + "  ait='图'>" + "<h3>" + target_url[i].title + "</h3>" + "<p>" + target_url[i].describe + "</p>" + "</a>" + "</li>" + "<p>" + "</p>" + "</ul>";
         div.innerHTML=div_n;
         var list =document.getElementById("ff");
         // 向上插入
