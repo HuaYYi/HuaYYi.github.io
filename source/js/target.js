@@ -186,4 +186,18 @@ var target_url =[
         title:"Element",
         describe:"Element，一套为开发者、设计师和产品经理准备的基于 Vue 2.0 的桌面端组件库"
     },
+    {
+        kind:"云存储",
+        href:"https://github.com/",
+        img:"https://github.com/fluidicon.pn",
+        title:"GitHub",
+        describe:"在云中给您的代码一个家"
+    },
+    {
+        kind:"云存储",
+        href:"https://gitee.com/",
+        img:"https://assets.gitee.com/assets/favicon-9007bd527d8a7851c8330e783151df58.ico",
+        title:"Gitee",
+        describe:"基于 Git 的代码托管和研发协作平台"
+    },
 ]
