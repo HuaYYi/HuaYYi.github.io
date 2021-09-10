@@ -165,4 +165,11 @@ var target_url =[
         title:"菜鸟教程",
         describe:"学的不仅是技术，更是梦想！"
     },
+    {
+        kind:"前端开发",
+        href:"https://youzan.github.io/vant/v3/#/zh-CN",
+        img:"https://img.yzcdn.cn/vant/logo.png",
+        title:"Vant",
+        describe:"轻量、可靠的移动端 Vue 组件库"
+    },
 ]
