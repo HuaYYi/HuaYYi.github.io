@@ -207,4 +207,11 @@ var target_url =[
         title:"凡科快图",
         describe:"让设计更简单"
     },
+    {
+        kind:"设计素材",
+        href:"http://www.1ppt.com/",
+        img:"http://www.1ppt.com/favicon.ico",
+        title:"第一PPT",
+        describe:"专注PowerPoint素材下载！"
+    },
 ]
