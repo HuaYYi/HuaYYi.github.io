@@ -182,7 +182,7 @@ var target_url =[
     {
         kind:"前端开发",
         href:"https://element.eleme.cn/#/zh-CN",
-        img:"https://raw.githubusercontent.com/ElemeFE/element/dev/examples/assets/images/element-logo-small.svg",
+        img:"https://element.eleme.cn/favicon.ico",
         title:"Element",
         describe:"Element，一套为开发者、设计师和产品经理准备的基于 Vue 2.0 的桌面端组件库"
     },
