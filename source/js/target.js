@@ -200,4 +200,11 @@ var target_url =[
         title:"Gitee",
         describe:"基于 Git 的代码托管和研发协作平台"
     },
+    {
+        kind:"设计工具",
+        href:"https://kt.fkw.com/",
+        img:"https://kt.fkw.com/favicon.ico",
+        title:"凡科快图",
+        describe:"让设计更简单"
+    },
 ]
