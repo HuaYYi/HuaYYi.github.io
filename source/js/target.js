@@ -214,4 +214,19 @@ var target_url =[
         title:"第一PPT",
         describe:"专注PowerPoint素材下载！"
     },
+    {
+        kind:"前端开发",
+        href:"https://www.jb51.net/",
+        img:"https://www.jb51.net/favicon.ico",
+        title:"脚本之家",
+        describe:"提供最新的网络编程、脚本编程、网页制作、网页设计、网页特效，为站长与网络编程从业者提供学习资料。"
+    },
+    {
+        kind:"知名博客",
+        href:"https://blog.daliansky.net/",
+        img:"https://hbimg.huabanimg.com/628fd206a0fe84497cfa052fc0f64b60c4f872e51221-v27DCr",
+        title:"黑果小兵的部落阁",
+        describe:"Hackintosh安装镜像、教程及经验分享"
+    },
+
 ]

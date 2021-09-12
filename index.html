@@ -11,28 +11,33 @@
     <link rel="stylesheet" href="source/css/response.css">
 </head>
 <body>
-    <div class="head_c">
-        <div>
-            <h1>网址导航</h1>
-            <select class="qqq" id="myList" onchange="way(this)">
-                <option value="https://www.baidu.com/s,wd,百度一下，你就知道">百度</option>
-                <option value="https://www.sogou.com/web,query,搜狗搜索">搜狗</option>
-                <option value="https://www.so.com/s,q,360搜索">360</option>
-                <option value="https://huaban.com/search/,q,搜索你喜欢的">花瓣</option>
-                <option value="http://zhannei.baidu.com/cse/site,q,搜索你喜欢的">PPT</option>
-            </select>
-            <form id="way" action="https://www.baidu.com/s" target="_blank">
-                <input id="way_name" type="text" name="wd" placeholder="百度一下，你就知道">
-                <button></button>
-            </form>
+    <header></header>
+    <main>
+        <div class="head_c">
+            <div>
+                <h1>网址导航</h1>
+                <select class="qqq" id="myList" onchange="way(this)">
+                    <option value="https://www.baidu.com/s,wd,百度一下，你就知道">百度</option>
+                    <option value="https://www.sogou.com/web,query,搜狗搜索">搜狗</option>
+                    <option value="https://www.so.com/s,q,360搜索">360</option>
+                    <option value="https://huaban.com/search/,q,搜索你喜欢的">花瓣</option>
+                    <option value="http://zhannei.baidu.com/cse/site,q,搜索你喜欢的">PPT</option>
+                </select>
+                <form id="way" action="https://www.baidu.com/s" target="_blank">
+                    <input id="way_name" type="text" name="wd" placeholder="百度一下，你就知道">
+                    <button></button>
+                </form>
+            </div>
         </div>
-    </div>
-    <div class="body_b"><div><div></div></div></div>
-    <div class="freedom" id="scrollto" onclick="goScrollTop()">
-        <img src="source/image/返回顶部.svg" alt="图">
-    </div>
-    <div id="ff" class="body_c"></div>
-    <div class="foot_c"></div>
+        <div class="body_b"><div><div></div></div></div>
+        <div id="ff" class="body_c"></div>
+    </main>
+    <footer>
+        <div class="freedom" id="scrollto" onclick="goScrollTop()">
+            <img src="source/image/返回顶部.svg" alt="图">
+        </div>
+        <div class="foot_c"></div>
+    </footer> 
 </body>
 </html>
 <script src="source/js/target.js"></script>
