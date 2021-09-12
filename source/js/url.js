@@ -1,5 +1,5 @@
 //添加默认图，img加载失败时使用
-var ddd ="this.src='source/image/sdcnav-8-2.png';this.onerror=null"
+var ddd ="this.src='source/image/default.svg';this.onerror=null"
 var sss =false
 //外层循环，对target_url进行循环
 for (var i = 0; i < target_url.length; i++){
