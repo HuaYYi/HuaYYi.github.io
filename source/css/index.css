@@ -2,6 +2,7 @@ body {
     margin: 0 auto;
     background: rgb(241, 244, 249)
 }
+
 .head_c {
     width: 100%;
     height: 200px;
@@ -154,6 +155,9 @@ body {
 }
 .foot_c {
     width: 100%;
-    height: 160px;
-    background-color: rgb(241, 244, 249);
+    margin-top: -10px;
+    text-align: center;
+    padding: 20px 0;
+    color: #777;
+    font-size: 12px;
 }
