@@ -361,4 +361,18 @@ var target_url =[
         title:"百度网盘",
         describe:"百度网盘为您提供文件的网络备份、同步和分享服务。空间大、速度快、安全稳固，支持教育网加速，支持手机端。注册使用百度网盘即可享受免费存储空间"
     },
+    {
+        kind:"影视媒体",
+        href:"https://www.douyin.com/recommend",
+        img:"https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico",
+        title:"抖音",
+        describe:"抖音让每一个人看见并连接更大的世界，鼓励表达、沟通和记录，激发创造，丰富人们的精神世界，让现实生活更美好。"
+    },
+    {
+        kind:"影视媒体",
+        href:"https://www.ixigua.com/",
+        img:"https://sf1-cdn-tos.douyinstatic.com/obj/eden-cn/lpqpflo/ixigua_favicon.ico",
+        title:"西瓜视频",
+        describe:"西瓜视频是一个开眼界、涨知识的视频 App，作为国内领先的中视频平台，它源源不断地为不同人群提供优质内容，让人们看到更丰富和有深度的世界，收获轻松的获得感，点亮对生活的好奇心。"
+    },
 ]
