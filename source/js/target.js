@@ -189,7 +189,7 @@ var target_url =[
     {
         kind:"云存储",
         href:"https://github.com/",
-        img:"https://github.com/fluidicon.pn",
+        img:"https://github.githubassets.com/favicons/favicon.png",
         title:"GitHub",
         describe:"在云中给您的代码一个家"
     },
