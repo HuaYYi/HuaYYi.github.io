@@ -35,3 +35,4 @@ for (var i = 0; i < target_url.length; i++){
         list.appendChild(div);
     } ;
 }
+console.log(i)
