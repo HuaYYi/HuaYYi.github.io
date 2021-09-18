@@ -375,4 +375,11 @@ var target_url =[
         title:"西瓜视频",
         describe:"西瓜视频是一个开眼界、涨知识的视频 App，作为国内领先的中视频平台，它源源不断地为不同人群提供优质内容，让人们看到更丰富和有深度的世界，收获轻松的获得感，点亮对生活的好奇心。"
     },
+        {
+        kind:"影视媒体",
+        href:"http://vip.8kvod.com:888/",
+        img:"http://vip.8kvod.com:888/template/mytheme/statics/image/20210121/188e68bdf.png",
+        title:"8K影视",
+        describe:"全网VIP免费看"
+    },
 ]
