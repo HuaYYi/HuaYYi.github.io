@@ -389,4 +389,11 @@ var target_url =[
         title:"jsDelivr",
         describe:"一个免费的开源 CDN快速、可靠和自动化"
     },
+    {
+        kind:"前端开发",
+        href:"https://picx.xpoet.cn/#/upload",
+        img:"https://picx.xpoet.cn/assets/logo.206d082d.png",
+        title:"PicX",
+        describe:"图床神器"
+    },
 ]
