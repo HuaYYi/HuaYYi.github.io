@@ -396,4 +396,11 @@ var target_url =[
         title:"PicX",
         describe:"图床神器"
     },
+    {
+        kind:"前端开发",
+        href:"http://tool.chinaz.com/",
+        img:"//csstools.chinaz.com/favicon.ico",
+        title:"站长之家",
+        describe:"站长工具是站长的必备工具。经常上站长工具可以了解SEO数据变化。"
+    },
 ]
