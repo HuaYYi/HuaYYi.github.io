@@ -410,4 +410,11 @@ var target_url =[
         title:"PDF24",
         describe:"免费且易于使用的在线PDF工具。"
     },
+    {
+        kind:"设计工具",
+        href:"https://pearocr.com/",
+        img:"https://pearocr.com/favicon.ico",
+        title:"PearOCR",
+        describe:"完全免费无限制的文字识别网站，从图片中识别出可复制的文字并导出！"
+    },
 ]
