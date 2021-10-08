@@ -403,4 +403,11 @@ var target_url =[
         title:"站长之家",
         describe:"站长工具是站长的必备工具。经常上站长工具可以了解SEO数据变化。"
     },
+    {
+        kind:"设计工具",
+        href:"https://tools.pdf24.org/zh/",
+        img:"https://tools.pdf24.org/static/img/appIcons/v3/icon_144.png",
+        title:"PDF24",
+        describe:"免费且易于使用的在线PDF工具。"
+    },
 ]
