@@ -28,16 +28,16 @@ var target_url =[
     {
         kind:"设计素材",
         href:"https://www.iconfont.cn/",
-        img:"https://www.bigbigwork.com/favicon.ico",
+        img:"https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png",
         title:"IconFont",
-        describe:"大作是专为设计师度身定制的集合式搜图引擎，同时收录全球最全的设计素材供设计师使用，为用户加速打开全球各大知名设计网站，一次搜索点击，一秒打开大图。"
+        describe:"国内最著名的图标搜索及管理平台，300万个图标下载"
     },
     {
         kind:"设计素材",
         href:"https://www.bigbigwork.com/home",
-        img:"https://image.uisdc.com/wp-content/uploads/2021/03/sdcnav-1-icon.png",
+        img:"https://www.bigbigwork.com/favicon.ico",
         title:"大作",
-        describe:"国内最著名的图标搜索及管理平台，300万个图标下载"
+        describe:"大作是专为设计师度身定制的集合式搜图引擎，同时收录全球最全的设计素材供设计师使用，为用户加速打开全球各大知名设计网站，一次搜索点击，一秒打开大图。"
     },
     {
         kind:"设计素材",
