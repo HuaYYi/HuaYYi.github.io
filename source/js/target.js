@@ -424,4 +424,11 @@ var target_url =[
         title:"PearOCR",
         describe:"完全免费无限制的文字识别网站，从图片中识别出可复制的文字并导出！"
     },
+        {
+        kind:"设计工具",
+        href:"https://toolb.cn/",
+        img:"https://toolb.cn/static/img/tool.svg",
+        title:"ToolB",
+        describe:"在线工具"
+    },
 ]
