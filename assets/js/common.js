@@ -6,17 +6,17 @@
    2. 根据 config.theme.primary 自动派生深色/浅色，注入 :root CSS 变量
    3. 根据 config.background 渲染动态背景（粒子 / 图片 / 视频 / 关闭）
    4. 提供 BlogUtils 对象给各页面脚本使用（ROOT、fetchJSON、escapeHTML、
-      icon、postHref、getPosts、本地模式工具等）
+      icon、postHref、getPosts、本地存储工具等）
 
    启动流程：
    DOMContentLoaded → fetch site-config.json → applyTheme → initBackground
      → renderHeader → renderFooter → dispatch('ssb-config-ready')
      → window.initPage(config)  // 各页面自己的初始化钩子
 
-   本地模式（config.localMode=true）：
-     文章/图片保存在浏览器 localStorage（键名见下方 LS_LIST_KEY / LS_CONTENT_KEY），
-     不走 GitHub API，不需要 PAT。common.js 只负责读取并并入列表；
-     写入由 admin.js 负责。
+   本地存储工作流：
+     后台所有改动（文章/配置/应用数据）先写入浏览器 localStorage，
+     前台读取时本地覆盖优先于仓库文件；写入由 admin.js 负责，
+     提交到 GitHub 统一走后台的「提交管理」。
    ============================================================ */
 
 (function () {
@@ -72,17 +72,17 @@
     },
 
     /* 文章详情链接：任何页面层级都能用。
-       本地模式下本地文章跳 view.html 动态渲染（无真实 HTML 文件）；
+       本地有覆盖的文章跳 view.html 动态渲染（无真实 HTML 文件）；
        其余情况直接跳 posts/*.html */
     postHref: function (file) {
-      if (this.isLocalMode() && this.isLocalFile(file)) {
+      if (this.isLocalFile(file)) {
         return ROOT + 'posts/view.html?file=' + encodeURIComponent(file);
       }
       return ROOT + 'posts/' + file;
     },
 
     /* ============================================================
-       本地模式（localStorage 文章存储）
+       本地文章（localStorage 存储）
        键约定（admin.js 与此文件保持完全一致，修改请同步）：
          ssb.local.posts            文章元数据数组 [{title,date,updated,file,summary,category,cover,local}]
          ssb.local.content.<file>   文章正文 HTML（编辑器 innerHTML）
@@ -91,9 +91,8 @@
     LS_CONTENT_KEY: 'ssb.local.content.',
     _localCache: null,         /* getLocalPosts() 的结果缓存 */
 
-    /* 站点设置的本地覆盖键（与 admin.js 保持一致，修改请同步）：
-       站点设置页在本地模式下把整份配置/应用数据存到这里，
-       前台读取时优先于仓库文件；「清空缓存」只清文章，不清这些键 */
+    /* 站点配置/应用数据的本地覆盖键（与 admin.js 保持一致，修改请同步）：
+       后台保存的内容写在这里，前台读取时优先于仓库文件 */
     LS_SITE_KEY: 'ssb.local.site-config',
     LS_APP_PREFIX: 'ssb.local.app.',
 
@@ -105,19 +104,13 @@
       try { return JSON.parse(raw); } catch (e) { return null; }
     },
 
-    /* 首页应用数据（search-engines/quotes/nav-links）统一入口：
-       本地模式下优先读 localStorage 覆盖，没有再 fetch 仓库 JSON。
-       与 getPosts() 同思路，保证后台改完本地即刻生效 */
+    /* 应用数据（search-engines/quotes/nav-links）统一入口：
+       始终优先读 localStorage 覆盖，没有再 fetch 仓库 JSON，
+       保证后台改完本地即刻生效 */
     loadDataFile: function (filename) {
-      if (this.isLocalMode()) {
-        var data = this.readLocalJSON(this.LS_APP_PREFIX + filename.replace(/\.json$/, ''));
-        if (data !== null) return Promise.resolve(data);
-      }
+      var data = this.readLocalJSON(this.LS_APP_PREFIX + filename.replace(/\.json$/, ''));
+      if (data !== null) return Promise.resolve(data);
       return this.fetchJSON(this.ROOT + filename);
-    },
-
-    isLocalMode: function () {
-      return !!(this.config && this.config.localMode);
     },
 
     getLocalPosts: function () {
@@ -136,34 +129,19 @@
       return this.getLocalPosts().some(function (p) { return p.file === file; });
     },
 
-    /* 清空本地模式数据：文章元数据列表 + 所有正文（ssb.local.content.* 前缀键）。
-       遍历整个 localStorage 按前缀删，而不是记死键名，是为了
-       将来若扩展出 ssb.local.images 等新前缀也一并覆盖到。
-       清完记得调 _localCache = null，让 getLocalPosts() 下次重新读取 */
-    clearLocalData: function () {
-      var removed = [];
-      for (var i = localStorage.length - 1; i >= 0; i--) {
-        var k = localStorage.key(i);
-        if (k === this.LS_LIST_KEY || k.indexOf(this.LS_CONTENT_KEY) === 0) {
-          removed.push(k);
-        }
-      }
-      removed.forEach(function (k) { localStorage.removeItem(k); });
-      this._localCache = null;
-      this._postsPromise = null;   /* 列表缓存一并失效，避免清空后还读到旧数据 */
-      return removed.length;
-    },
-
-    /* 读取并缓存文章列表，按日期倒序；本地模式会把本地文章并入列表 */
+    /* 读取并缓存文章列表，按日期倒序；本地保存的文章会并入列表。
+       合并按 file 去重：同一篇文章正在本地编辑时，本地条目覆盖仓库条目，
+       避免列表出现重复行（提交后本地条目清除，自然回落到仓库版本） */
     getPosts: function () {
       if (!this._postsPromise) {
         var self = this;
         this._postsPromise = this.fetchJSON(ROOT + 'posts-list.json')
           .then(function (list) {
-            var merged = Array.isArray(list) ? list.slice() : [];
-            if (self.isLocalMode()) {
-              merged = merged.concat(self.getLocalPosts());
-            }
+            var localMap = {};
+            self.getLocalPosts().forEach(function (p) { localMap[p.file] = p; });
+            var merged = (Array.isArray(list) ? list : [])
+              .filter(function (p) { return !localMap[p.file]; })
+              .concat(Object.keys(localMap).map(function (f) { return localMap[f]; }));
             return merged.sort(function (a, b) {
               return new Date(b.date) - new Date(a.date);
             });
@@ -475,8 +453,7 @@
     });
   }
 
-  /* ---------- 页脚：收藏横条（左 Ctrl/⌘+D 键帽提示，右社交图标）+ 版权行。
-     本地模式标记仍是浮动独立元素（fixed 左下角，脱离文档流） ---------- */
+  /* ---------- 页脚：收藏横条（左 Ctrl/⌘+D 键帽提示，右社交图标）+ 版权行 ---------- */
   function renderFooter(config) {
     var footer = document.getElementById('site-footer');
     if (!footer) return;
@@ -490,31 +467,6 @@
     footer.style.marginLeft = '0';
     footer.style.marginRight = '0';
     footer.style.padding = '0';
-
-    /* 本地模式标记：脱离文档流，绝对定位贴左下角，不影响 footer 居中。
-       右侧附带「清空缓存」按钮：本地文章全存在 localStorage，
-       用户手动清理（F12 → Application → Local Storage）门槛高，
-       所以在角标里直接给一个入口，点了二次确认再清，防误触 */
-    if (BlogUtils.isLocalMode()) {
-      var existing = document.getElementById('local-flag-float');
-      if (!existing) {
-        var flag = document.createElement('div');
-        flag.id = 'local-flag-float';
-        flag.className = 'local-flag-float';
-        flag.innerHTML = '<span>本地模式 · 文章仅保存在此浏览器</span>' +
-          '<button type="button" class="local-flag-clear" title="删除所有本地保存的文章与图片">' +
-          BlogUtils.escapeHTML('清空缓存') + '</button>';
-        flag.querySelector('.local-flag-clear').addEventListener('click', function (e) {
-          /* stopPropagation：角标本体无点击行为，这里只是防御性隔离，避免未来加整条点击时误触发 */
-          e.stopPropagation();
-          var ok = window.confirm('确定清空本地缓存的文章与图片吗？\n该操作不可恢复，建议先在后台导出备份。');
-          if (!ok) return;
-          BlogUtils.clearLocalData();
-          location.reload();   /* 清完刷新，让各页面的文章列表回到仓库内容 */
-        });
-        document.body.appendChild(flag);
-      }
-    }
 
     /* 收藏快捷键提示：Apple 设备是 ⌘ Command，其余（Windows/Linux）是 Ctrl */
     var isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
@@ -1135,12 +1087,11 @@
   document.addEventListener('DOMContentLoaded', function () {
     BlogUtils.fetchJSON(ROOT + 'site-config.json')
       .then(function (config) {
-        /* 本地模式：站点设置页保存的整份配置覆盖仓库文件。
-           只在文件本身声明 localMode 时才读覆盖，避免线上配置被本机残留干扰 */
-        if (config.localMode) {
-          var localConfig = BlogUtils.readLocalJSON(BlogUtils.LS_SITE_KEY);
-          if (localConfig) config = localConfig;
-        }
+        /* 后台「站点设置」保存的整份配置覆盖优先于仓库文件。
+           这是本地存储工作流的预期行为：访客浏览器里没有覆盖键时
+           自动回落到 fetch 到的仓库配置，不受任何影响 */
+        var localConfig = BlogUtils.readLocalJSON(BlogUtils.LS_SITE_KEY);
+        if (localConfig) config = localConfig;
         BlogUtils.config = config;
 
         /* 配置到达后校准主题（theme.dark 默认值在没有手动选择时生效），

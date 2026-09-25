@@ -114,38 +114,6 @@ body {
   font-weight: 600;
 }
 
-/* PAT 状态点 */
-.pat-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
-  color: var(--text-2);
-}
-
-.pat-status i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-3);
-}
-
-.pat-status.ok {
-  color: #16a34a;
-}
-
-.pat-status.ok i {
-  background: #22c55e;
-}
-
-.pat-status.warn {
-  color: #d97706;
-}
-
-.pat-status.warn i {
-  background: #f59e0b;
-}
-
 /* localStorage 用量指示（顶栏） */
 .ls-usage {
   display: inline-flex;
@@ -243,6 +211,19 @@ body {
   background: var(--primary-dark);
   border-color: var(--primary-dark);
   color: #fff;
+}
+
+/* 危险操作的次按钮：红字淡红底，用于「清空本地数据」这类
+   需要警示但不属于主操作路径的按钮（不做成实心红，避免视觉过重） */
+.btn-danger-ghost {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.btn-danger-ghost:hover {
+  color: #b91c1c;
+  border-color: #fca5a5;
+  background: #fee2e2;
 }
 
 .btn-danger {
@@ -550,43 +531,7 @@ body {
   display: none;
 }
 
-/* ---------- 设置页 ---------- */
-.settings-card {
-  padding: 26px 28px;
-  max-width: 760px;
-}
-
-.settings-card h2 {
-  font-size: 18px;
-  margin-bottom: 12px;
-}
-
-.settings-second {
-  margin-top: 34px !important;
-}
-
-.settings-hint {
-  font-size: 14px;
-  color: var(--text-2);
-  background: var(--primary-light);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 20px;
-  line-height: 1.7;
-}
-
-.settings-hint code {
-  background: rgba(255, 255, 255, .7);
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: var(--primary-dark);
-  font-size: 13px;
-}
-
-.settings-actions {
-  margin-bottom: 10px;
-}
-
+/* ---------- 表单消息（站点设置 / 提交管理等共用） ---------- */
 .form-msg {
   font-size: 14px;
   min-height: 22px;
@@ -611,31 +556,15 @@ body {
   color: var(--text);
 }
 
-/* ---------- 本地模式 ---------- */
-/* 通用隐藏（本地模式下隐藏 PAT 区块等；.view.hidden 等原有规则不受影响） */
+/* ---------- 通用隐藏类 ---------- */
 .hidden {
   display: none;
-}
-
-.local-notice {
-  background: var(--primary-light);
-  border: 1px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 13px 16px;
-  font-size: 14px;
-  line-height: 1.8;
-  margin-bottom: 20px;
 }
 
 .local-badge {
   color: #d97706;
   background: #fef3c7;
   margin-left: 7px;
-}
-
-.ro-hint {
-  font-size: 13px;
-  color: var(--text-3);
 }
 
 /* ---------- 全局提示 Toast ---------- */
@@ -1669,6 +1598,21 @@ body {
   background: rgba(0, 0, 0, .06);
   padding: 1px 5px;
   border-radius: 4px;
+}
+
+/* PAT 生成指引折叠：默认收起不占版面，展开后小字步骤 */
+.cm-pat-help {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.cm-pat-help > summary {
+  cursor: pointer;
+  color: var(--primary);
+}
+.cm-pat-help .hint-list {
+  margin: 8px 0 2px;
+  font-size: 13px;
 }
 
 /* 分组卡片 */

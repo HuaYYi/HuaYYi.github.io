@@ -1,15 +1,14 @@
 {
   "_comment": {
-    "使用说明": "本文件是整个博客的站点配置，修改后保存即可生效（本地模式下刷新页面看到）",
+    "使用说明": "本文件是整个博客的站点配置，在后台保存后刷新页面即可看到效果",
     "字段详解": {
       "siteName": "站点名称，显示在标题栏、页脚、后台品牌处",
       "description": "站点简介（一句话），用于搜索引擎结果与社交分享卡片的 meta description，留空则不输出",
       "logo": "站点 logo 图片地址（留空则显示纯文字站点名称）",
       "author": "作者名字（about 页可用）",
       "avatar": "作者头像地址（about 页可用）",
-      "repo": "GitHub 仓库地址，格式 owner/repo（如 huayyi/huayyi.github.io）。本地模式下可留默认占位值",
+      "repo": "GitHub 仓库地址，格式 owner/repo（如 huayyi/huayyi.github.io），是提交管理上传改动的目标仓库",
       "branch": "分支名，默认 main",
-      "localMode": "是否开启本地模式。true=文章保存在浏览器 localStorage，不访问 GitHub、无需 PAT；false=走 GitHub 提交流程",
       "theme.primary": "主题色十六进制（如 #1d6ff2），common.js 自动派生 hover 深色和浅底高亮色注入 :root",
       "theme.dark": "暗色模式默认策略：auto=跟随系统外观 / light=默认亮色 / dark=默认暗色。用户在页面右上角的手动切换会记住选择并覆盖此默认值",
       "background.type": "首页动态背景类型：particles=粒子动画 / image=静态图 / video=循环视频 / none=关闭",
@@ -33,7 +32,6 @@
   "avatar": "",
   "repo": "HuaYYi/HuaYYi.github.io",
   "branch": "main",
-  "localMode": true,
 
   "theme": {
     "primary": "#1d6ff2",

@@ -29,11 +29,8 @@
         <a href="javascript:;" class="nav-item" data-view="apps">
           <span class="nav-icon">🧩</span>应用管理
         </a>
-        <a href="javascript:;" class="nav-item hidden" id="nav-commit" data-view="commit">
+        <a href="javascript:;" class="nav-item" id="nav-commit" data-view="commit">
           <span class="nav-icon">🚀</span>提交管理
-        </a>
-        <a href="javascript:;" class="nav-item" data-view="settings">
-          <span class="nav-icon">🔑</span>登录
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -50,7 +47,6 @@
             <span class="ls-usage-text" id="ls-usage-text">缓存 --</span>
             <span class="ls-usage-bar"><span class="ls-usage-fill" id="ls-usage-fill"></span></span>
           </span>
-          <span class="pat-status" id="pat-status"><i></i>未连接</span>
         </div>
       </header>
 
@@ -85,7 +81,7 @@
             <button type="button" class="btn" id="btn-back">← 返回列表</button>
             <div class="action-right">
               <button type="button" class="btn" id="btn-preview">👁 预览</button>
-              <button type="button" class="btn btn-primary" id="btn-save">保存发布</button>
+              <button type="button" class="btn btn-primary" id="btn-save">保存到本地</button>
             </div>
           </div>
 
@@ -145,7 +141,7 @@
           <div class="action-row">
             <button type="button" class="btn" id="btn-site-reload">重新加载</button>
             <div class="action-right">
-              <button type="button" class="btn hidden" id="btn-site-reset">恢复仓库默认</button>
+              <button type="button" class="btn" id="btn-site-reset">恢复仓库默认</button>
               <button type="button" class="btn btn-primary" id="btn-site-save">保存设置</button>
             </div>
           </div>
@@ -162,7 +158,7 @@
             <button type="button" class="btn" id="btn-pages-reload">重新加载</button>
             <div class="action-right">
               <button type="button" class="btn" id="btn-page-new">＋ 新建页面</button>
-              <button type="button" class="btn hidden" id="btn-pages-reset">恢复仓库默认</button>
+              <button type="button" class="btn" id="btn-pages-reset">恢复仓库默认</button>
               <button type="button" class="btn btn-primary" id="btn-pages-save">保存页面</button>
             </div>
           </div>
@@ -235,7 +231,7 @@
           <div class="action-row">
             <button type="button" class="btn" id="btn-apps-reload">重新加载</button>
             <div class="action-right">
-              <button type="button" class="btn hidden" id="btn-apps-reset">恢复仓库默认</button>
+              <button type="button" class="btn" id="btn-apps-reset">恢复仓库默认</button>
               <button type="button" class="btn btn-primary" id="btn-apps-new">＋ 新建应用</button>
             </div>
           </div>
@@ -291,6 +287,7 @@
         <section class="view hidden" id="view-commit">
           <div class="action-row">
             <button type="button" class="btn" id="btn-cm-refresh">重新检测</button>
+            <button type="button" class="btn btn-danger-ghost" id="btn-cm-clearall">清空本地数据</button>
             <div class="action-right">
               <button type="button" class="btn btn-primary" id="btn-cm-submit">提交选中项到 GitHub</button>
             </div>
@@ -298,18 +295,26 @@
 
           <div class="card commit-intro">
             <p class="section-hint">
-              本地模式下，文章、应用代码、页面与配置都先保存在<b>本浏览器</b>中，可以在前台反复测试；
+              文章、应用代码、页面与配置都先保存在<b>本浏览器</b>中，可以在前台反复测试；
               确认可靠后，在这里勾选要提交的文件，一次提交到 GitHub 仓库（随后 Actions 自动构建，约 1~2 分钟上线）。
               不勾选的改动继续留在本地，不受影响。
             </p>
             <div id="cm-repo-warn" class="commit-warn hidden">
-              当前 site-config.json 的 <code>repo</code> 还是占位值。请先到「站点设置」填写真实仓库（格式 owner/repo，
-              本地模式无需关闭 localMode），保存后回到本页。
+              当前 site-config.json 的 <code>repo</code> 还是占位值。请先到「站点设置」填写真实仓库（格式 owner/repo），保存后回到本页。
             </div>
             <div class="form-grid form-grid-2 commit-meta-row">
               <label class="form-field">
-                <span>GitHub PAT（仅本页面内存保留，需要仓库 Contents 写权限；生成方法见「登录」页）</span>
+                <span>GitHub PAT（Fine-grained token，需仓库 Contents 读写权限，仅本页面内存保留）</span>
                 <input type="password" id="cm-pat" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off">
+                <details class="cm-pat-help">
+                  <summary>如何生成 PAT？</summary>
+                  <ol class="hint-list">
+                    <li>打开 GitHub → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → Generate new token</li>
+                    <li>Repository access 选择本博客所在仓库</li>
+                    <li>Repository permissions 中把 <b>Contents</b> 设为 <b>Read and write</b>，其余权限不需要</li>
+                    <li>过期时间按需选择（例如 7 天），生成后复制粘贴到上方输入框即可</li>
+                  </ol>
+                </details>
               </label>
               <label class="form-field">
                 <span>提交说明（留空自动生成）</span>
@@ -321,51 +326,6 @@
 
           <div class="form-msg" id="cm-msg"></div>
           <div id="cm-groups"><div class="site-loading">加载中…</div></div>
-        </section>
-
-        <!-- 视图七：登录（PAT 连接） -->
-        <section class="view hidden" id="view-settings">
-          <div class="card settings-card">
-            <div class="local-notice hidden" id="local-notice">
-              当前为 <b>本地模式</b>（site-config.json 中 <code>"localMode": true</code>）：
-              文章保存在本浏览器的 localStorage 中，仅本机可见，无需 PAT。
-              上线部署前请把 localMode 改回 <code>false</code>。
-            </div>
-            <h2>GitHub 连接</h2>
-            <p class="settings-hint">
-              仓库信息读取自 <code>site-config.json</code>。GitHub PAT 仅保存在当前页面内存中，
-              刷新或关闭页面后立即失效，不会写入浏览器存储或任何文件。
-            </p>
-            <div class="form-grid form-grid-2">
-              <label class="form-field">
-                <span>仓库（owner/repo）</span>
-                <input type="text" id="set-repo" readonly placeholder="自动读取 site-config.json">
-              </label>
-              <label class="form-field">
-                <span>分支</span>
-                <input type="text" id="set-branch" readonly>
-              </label>
-            </div>
-            <label class="form-field" id="pat-field">
-              <span>GitHub PAT（Fine-grained token，Contents 读写权限）</span>
-              <input type="password" id="set-pat" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off">
-            </label>
-            <div class="action-row settings-actions" id="pat-actions">
-              <button type="button" class="btn" id="btn-test">测试连接</button>
-              <button type="button" class="btn" id="btn-clear-pat">清除 PAT</button>
-            </div>
-            <div class="form-msg" id="set-msg"></div>
-
-            <div id="pat-help">
-              <h2 class="settings-second">如何生成 PAT</h2>
-              <ol class="hint-list">
-                <li>打开 GitHub → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → Generate new token</li>
-                <li>Repository access 选择本博客所在仓库</li>
-                <li>Repository permissions 中把 <b>Contents</b> 设置为 <b>Read and write</b>，其余权限不需要</li>
-                <li>过期时间按需选择（例如 7 天），生成后复制粘贴到上方输入框即可</li>
-              </ol>
-            </div>
-          </div>
         </section>
 
       </div>

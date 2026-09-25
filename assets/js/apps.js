@@ -121,15 +121,13 @@
       });
   }
 
-  /* 应用代码来源：本地模式优先 localStorage 覆盖（后台编辑保存），
-     否则 fetch applications/<id>.js（no-cache，改完强刷即生效） */
+  /* 应用代码来源：始终优先 localStorage 覆盖（后台编辑保存后即时生效），
+     没有覆盖再 fetch applications/<id>.js（no-cache，改完强刷即生效） */
   function fetchAppCode(id) {
-    if (U.isLocalMode && U.isLocalMode()) {
-      try {
-        var raw = localStorage.getItem(LS_APPCODE_PREFIX + id);
-        if (raw != null) return Promise.resolve(raw);
-      } catch (e) {}
-    }
+    try {
+      var raw = localStorage.getItem(LS_APPCODE_PREFIX + id);
+      if (raw != null) return Promise.resolve(raw);
+    } catch (e) {}
     return fetch(U.ROOT + APPS_DIR + encodeURIComponent(id) + '.js', { cache: 'no-cache' })
       .then(function (res) {
         if (!res.ok) throw new Error('代码文件读取失败：' + APPS_DIR + id + '.js（HTTP ' + res.status + '）');
@@ -159,12 +157,10 @@
   /* 读取应用代码原文（后台编辑器用，不经过注册表）：
      与 fetchAppCode 同路径，但不依赖 initPage 流程 */
   function readAppCode(id) {
-    if (U.isLocalMode && U.isLocalMode()) {
-      try {
-        var raw = localStorage.getItem(LS_APPCODE_PREFIX + id);
-        if (raw != null) return Promise.resolve(raw);
-      } catch (e) {}
-    }
+    try {
+      var raw = localStorage.getItem(LS_APPCODE_PREFIX + id);
+      if (raw != null) return Promise.resolve(raw);
+    } catch (e) {}
     return fetch(U.ROOT + APPS_DIR + encodeURIComponent(id) + '.js', { cache: 'no-cache' })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);

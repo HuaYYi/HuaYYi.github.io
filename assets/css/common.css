@@ -687,49 +687,6 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
   }
 }
 
-/* ---------- 本地模式角标（site-config.json 的 localMode: true 时显示）
-   absolute 定位到 body 左下角，脱离文档流，不影响 footer 居中 ---------- */
-.local-flag-float {
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 999;
-  background: var(--primary);
-  color: #fff;
-  font-size: 12px;
-  line-height: 1;
-  padding: 7px 13px;
-  border-radius: 999px;
-  opacity: .85;
-  pointer-events: none;   /* 角标本体是纯展示，不挡底下元素的点击 */
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 角标内的「清空缓存」按钮：角标本身 pointer-events:none，
-   按钮必须单独恢复 auto 才能点击（局部覆盖，不影响其他区域透点） */
-.local-flag-clear {
-  pointer-events: auto;
-  border: none;
-  background: rgba(255, 255, 255, .25);
-  color: #fff;
-  font-size: 12px;
-  line-height: 1;
-  font-family: inherit;
-  padding: 4px 9px;
-  margin: -3px -6px -3px 0;   /* 抵消角标自身 padding，让按钮热区贴右缘 */
-  border-radius: 999px;
-  cursor: pointer;
-  opacity: .9;
-  transition: background .2s, opacity .2s;
-}
-.local-flag-clear:hover {
-  background: rgba(255, 255, 255, .38);
-  opacity: 1;
-}
-
 /* ============================================================
    汉堡按钮（桌面隐藏，窄屏显示）
    ============================================================ */

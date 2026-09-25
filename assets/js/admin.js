@@ -1,16 +1,12 @@
 /* ============================================================
-   admin.js —— 博客在线管理后台
+   admin.js —— 博客管理后台
    纯原生 JS，直连 GitHub REST API（无 CORS 问题，原生支持）
-   鉴权：手动粘贴 Fine-grained PAT，仅保存在内存变量中，不持久化
-   图片策略：粘贴/选择的图片先以 dataURL 留在编辑器里做本地预览，
-             点「保存发布」时才统一上传，并替换为相对路径
-   提交方式：Git Trees API 把「多张图片 + 文章 HTML + 列表 JSON」
-             合成一次 commit
-
-   本地模式（site-config.json 的 "localMode": true）：
-     完全不访问 GitHub —— 文章/图片直接写入浏览器 localStorage，
-     前台通过 posts/view.html 动态渲染本地文章，无需 PAT；
-     改回 false 即恢复「PAT + GitHub 提交」的上线流程
+   工作流：所有改动（文章/配置/页面/应用）先写入浏览器 localStorage，
+           可立刻在前台反复测试；确认可靠后在「提交管理」勾选改动、
+           填入 Fine-grained PAT，通过 Git Trees API 一次性提交。
+   PAT 策略：仅保存在内存变量中，不持久化，刷新即失效。
+   图片策略：编辑器内先以 dataURL 本地预览，提交时统一抽出为
+             assets/images/ 下的独立文件并替换为相对路径。
    ============================================================ */
 
 (function () {
@@ -31,24 +27,23 @@
 
   /* ---------------- 状态 ---------------- */
   var config = null;            // site-config.json
-  var postsCache = [];          // posts-list.json 缓存
+  var postsCache = [];          // 文章列表缓存（仓库 + 本地合并后）
+  var repoPostsCache = [];      // 仓库文章基线（不含本地），用于判断本地文章线上是否存在
   var pat = '';                 // PAT 仅存在于此内存变量
   var editingFile = null;       // 正在编辑的文件名；null = 新建
   var coverDataURL = null;      // 新选封面（本地 dataURL，保存时上传）
   var coverRemote = '';         // 编辑时已有封面（远程相对路径）
   var isPreview = false;
 
-  /* 本地模式（site-config.json 的 "localMode": true）：
-     文章写入浏览器 localStorage，不访问 GitHub、不需要 PAT。
-     键约定与 common.js / posts/view.html 保持一致 */
+  /* 本地存储：
+     文章写入浏览器 localStorage，不直接写 GitHub；
+     提交统一走「提交管理」。键约定与 common.js / posts/view.html 一致 */
   var LS_LIST_KEY = 'ssb.local.posts';
   var LS_CONTENT_KEY = 'ssb.local.content.';
 
-  /* 站点设置本地模式的覆盖键（与 common.js 中保持一致，修改请同步）：
+  /* 站点配置与应用数据的本地覆盖键（与 common.js 中保持一致，修改请同步）：
      ssb.local.site-config        整份 site-config.json 的本地覆盖
-     ssb.local.app.<文件名去后缀>  首页应用数据（search-engines / quotes / nav-links）
-     注意：「清空缓存」只删文章键（ssb.local.posts / ssb.local.content.*），
-     不会清这些配置键——配置是用户在站点设置页显式维护的，语义独立 */
+     ssb.local.app.<文件名去后缀>  首页应用数据（search-engines / quotes / nav-links） */
   var LS_SITE_KEY = 'ssb.local.site-config';
   var LS_APP_PREFIX = 'ssb.local.app.';
 
@@ -59,7 +54,7 @@
     quotes: 'quotes.json',
     nav: 'nav-links.json'
   };
-  var SAVE_TEXT = '保存发布';   /* 本地模式下初始化为「保存到本地」 */
+  var SAVE_TEXT = '保存到本地';   /* 保存失败时按钮恢复的统一文案 */
 
   /* DOM 快捷方式 */
   var $ = function (id) { return document.getElementById(id); };
@@ -120,11 +115,7 @@
     return { mime: m[1], b64: m[2], ext: extMap[m[1]] || 'png' };
   }
 
-  /* ---------------- 本地模式（localStorage 文章） ---------------- */
-
-  function isLocalMode() {
-    return !!(config && config.localMode);
-  }
+  /* ---------------- 本地存储（localStorage 文章） ---------------- */
 
   function readLocalList() {
     try {
@@ -151,16 +142,14 @@
   }
 
   /* 站点设置数据文件读取：
-     本地模式优先读 localStorage 覆盖，没有再读静态文件；
-     线上模式走 readRepoFile（GitHub API 最新 → 同源静态文件兜底） */
+     始终优先读 localStorage 覆盖，没有再走 readRepoFile
+     （GitHub API 最新 → 同源静态文件兜底） */
   function readDataFile(filename) {
-    if (isLocalMode()) {
-      var key = filename === SITE_FILES.config
-        ? LS_SITE_KEY
-        : LS_APP_PREFIX + filename.replace(/\.json$/, '');
-      var local = readLocalJSON(key);
-      if (local !== null) return Promise.resolve(local);
-    }
+    var key = filename === SITE_FILES.config
+      ? LS_SITE_KEY
+      : LS_APP_PREFIX + filename.replace(/\.json$/, '');
+    var local = readLocalJSON(key);
+    if (local !== null) return Promise.resolve(local);
     return readRepoFile(filename).then(function (f) {
       if (!f) return null;
       return JSON.parse(f.text);
@@ -303,10 +292,10 @@
 
   var VIEW_TITLES = { posts: '文章管理', editor: '编辑文章', site: '站点设置',
     pages: '页面管理', 'page-editor': '编辑页面', apps: '应用管理',
-    commit: '提交管理', settings: '登录' };
+    commit: '提交管理' };
 
   function showView(name) {
-    ['posts', 'editor', 'site', 'pages', 'page-editor', 'apps', 'commit', 'settings']
+    ['posts', 'editor', 'site', 'pages', 'page-editor', 'apps', 'commit']
       .forEach(function (v) {
         $('view-' + v).classList.toggle('hidden', v !== name);
       });
@@ -343,20 +332,31 @@
           throw new Error('posts-list.json 解析失败：' + e.message);
         }
       }
-      /* 本地模式：把浏览器里保存的本地文章并入列表 */
-      if (isLocalMode()) {
-        readLocalList().forEach(function (p) {
-          p.local = true;
-          list.push(p);
-        });
-      }
+      repoPostsCache = list.slice();   /* 本地合并前的仓库基线 */
+      /* 把浏览器里保存的本地文章并入列表。
+         按 file 去重：正在本地编辑的线上文章由本地条目覆盖，
+         避免同一篇文章出现两行（提交后本地条目清除即回落仓库版本） */
+      var localMap = {};
+      readLocalList().forEach(function (p) {
+        p.local = true;
+        localMap[p.file] = p;
+      });
+      list = list.filter(function (p) { return !localMap[p.file]; })
+        .concat(Object.keys(localMap).map(function (f) { return localMap[f]; }));
+      /* 已登记删除的线上文章立即从列表消失（提交前只存在于待提交区） */
+      var pending = pendingStore();
+      var deletedFiles = {};
+      pending.deletes.forEach(function (d) {
+        if (isPostHtmlPath(d.path)) deletedFiles[d.path.slice('posts/'.length)] = 1;
+      });
+      list = list.filter(function (p) { return !deletedFiles[p.file]; });
       postsCache = list.slice().sort(function (a, b) {
         return new Date(b.date) - new Date(a.date);
       });
       renderPostsTable();
     }).catch(function (err) {
       tbody.innerHTML = '<tr><td colspan="4" class="table-loading">加载失败：' +
-        escapeHTML(err.message) + '<br>未填写 PAT 时匿名访问每小时有限额，可到「设置」中填写 PAT</td></tr>';
+        escapeHTML(err.message) + '<br>网络异常时可稍后重试，读取不影响已保存的本地文章</td></tr>';
     });
   }
 
@@ -370,10 +370,8 @@
     tbody.innerHTML = postsCache.map(function (p) {
       var cat = p.category ? '<span class="cat-badge">' + escapeHTML(p.category) + '</span>' : '—';
       var localBadge = p.local ? '<span class="cat-badge local-badge">本地</span>' : '';
-      /* 本地模式下线上文章只读，不提供编辑/删除入口 */
-      var ops = (isLocalMode() && !p.local)
-        ? '<span class="ro-hint">线上 · 只读</span>'
-        : '<button type="button" class="btn-link btn" data-edit="' + escapeHTML(p.file) + '">编辑</button>' +
+      /* 所有文章均可编辑 / 删除：线上文章的改动会登记到「提交管理」 */
+      var ops = '<button type="button" class="btn-link btn" data-edit="' + escapeHTML(p.file) + '">编辑</button>' +
           '<button type="button" class="btn-danger btn" data-del="' + escapeHTML(p.file) + '">删除</button>';
       return '<tr>' +
         '<td><strong>' + escapeHTML(p.title) + '</strong>' + localBadge + '</td>' +
@@ -493,46 +491,33 @@
   function deletePost(file) {
     var item = postsCache.filter(function (p) { return p.file === file; })[0];
 
-    /* 本地模式：只允许删除本地文章，线上文章保持只读 */
-    if (isLocalMode()) {
-      if (!item || !item.local) {
-        toast('本地模式下线上文章只读；关闭 localMode 并填写 PAT 后才能删除线上文章', true);
-        return;
-      }
+    /* 本地保存过的文章（含新文章与正在编辑的线上文章）：只清本地 */
+    if (item && item.local) {
       if (!confirm('确定删除本地文章《' + (item.title || file) + '》吗？\n（仅从本浏览器删除，不影响 GitHub 仓库）')) return;
+      /* 先判断线上是否存在同名文章：存在则删除后只是丢弃本地修改、
+         文章回落到仓库版本；不存在（纯本地新文章）才是真正消失 */
+      var existsOnline = repoPostsCache.some(function (p) { return p.file === file; });
       var rest = readLocalList().filter(function (p) { return p.file !== file; });
       try {
         localStorage.removeItem(LS_CONTENT_KEY + file);
         writeLocalList(rest);
-        /* 未提交的新文章：直接撤销待提交登记即可（不会产生远端删除） */
+        /* 撤销待提交登记：本地内容没了，提交行不应残留 */
         pendingForget('posts/' + file);
       } catch (e) {}
       loadPosts();
-      toast('本地文章已删除');
+      toast(existsOnline
+        ? '本地修改已丢弃，文章回落到线上版本；如要删除线上文章请再次点击删除'
+        : '本地文章已删除');
       return;
     }
 
-    if (!pat) {
-      toast('请先到「设置」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
-
-    if (!confirm('确定删除《' + (item ? item.title : file) + '》吗？\n（文章 HTML 与列表记录会被删除，已上传的图片保留在仓库中）')) return;
-
-    var nextList = postsCache.filter(function (p) { return p.file !== file; });
-
-    commitFiles(
-      [{ path: 'posts-list.json', content: JSON.stringify(nextList, null, 2) + '\n' }],
-      ['posts/' + file],
-      'post(delete): ' + (item ? item.title : file)
-    ).then(function () {
-      postsCache = nextList;
-      renderPostsTable();
-      toast('已删除，GitHub Pages 1~2 分钟后生效');
-    }).catch(function (err) {
-      toast('删除失败：' + err.message, true);
-    });
+    /* 线上文章：不直接访问 GitHub，登记为「待提交删除」，
+       勾选提交后才真正从仓库删除（列表记录也在提交时同步剔除） */
+    if (!confirm('确定删除线上文章《' + (item ? item.title : file) + '》吗？\n（会登记到「提交管理」，勾选提交后才从 GitHub 删除，已上传的图片保留）')) return;
+    pendingDelete('posts/' + file, item ? item.title : file, '文章');
+    commitLoaded = false;
+    loadPosts();
+    toast('已登记删除，请到「提交管理」勾选提交');
   }
 
   /* ============================================================
@@ -807,17 +792,10 @@
   }
 
   /* ============================================================
-     保存发布
+     本地保存
      ============================================================ */
 
   function savePost() {
-    /* 本地模式不需要 PAT；线上模式必须先填写 */
-    if (!isLocalMode() && !pat) {
-      toast('请先到「设置」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
-
     /* 1. 校验表单 */
     var title = $('f-title').value.trim();
     var slug = $('f-slug').value.trim().toLowerCase();
@@ -836,145 +814,21 @@
 
     var file = slug + '.html';
 
-    /* 新建时禁止与已有文件重名（postsCache 已包含本地 + 线上，天然覆盖两种模式） */
+    /* 新建时禁止与已有文件重名（postsCache 已包含仓库 + 本地文章） */
     if (!editingFile && postsCache.some(function (p) { return p.file === file; })) {
       toast('slug 已存在，请换一个（或在列表中编辑原文章）', true);
       $('f-slug').focus();
       return;
     }
 
-    /* 本地模式：不访问 GitHub，直接写入浏览器 localStorage */
-    if (isLocalMode()) {
-      saveLocalPost({
-        title: title, slug: slug, date: date, category: category,
-        summary: summary, coverUrl: coverUrlInput, file: file
-      });
-      return;
-    }
-
-    var btn = $('btn-save');
-    btn.disabled = true;
-    btn.textContent = '保存中…';
-
-    /* 2. 收集编辑器内所有本地图片（dataURL），去重 */
-    var editor = $('editor-body');
-    var imgs = Array.prototype.slice.call(editor.querySelectorAll('img'));
-    var localImgs = imgs.filter(function (img) {
-      return /^data:image\//.test(img.src);
-    });
-
-    var uploadMap = {};   /* dataURL -> 仓库路径（带 ../ 前缀，供文章 HTML 使用） */
-    var filesToCommit = [];
-    var ym = date.slice(0, 4) + '/' + date.slice(5, 7);
-
-    localImgs.forEach(function (img) {
-      if (uploadMap[img.src]) return;
-      var parsed = parseDataURL(img.src);
-      if (!parsed) return;
-      var repoPath = 'assets/images/' + ym + '/' + slug + '-' + rand6() + '.' + parsed.ext;
-      uploadMap[img.src] = '../' + repoPath;
-      filesToCommit.push({ path: repoPath, content: parsed.b64, encoding: 'base64' });
-    });
-
-    /* 3. 封面：本地新图也上传；否则用手填 URL 或保留旧封面 */
-    var finalCover = coverRemote || coverUrlInput || '';
-    if (coverDataURL) {
-      var cp = parseDataURL(coverDataURL);
-      if (cp) {
-        var coverRepoPath = 'assets/images/' + ym + '/cover-' + slug + '-' + rand6() + '.' + cp.ext;
-        filesToCommit.push({ path: coverRepoPath, content: cp.b64, encoding: 'base64' });
-        finalCover = '../' + coverRepoPath;
-      }
-    }
-
-    /* 4. 生成提交用正文：只在字符串层面把 dataURL 替换为相对路径。
-       DOM 中保留 dataURL 不动，这样万一提交失败，重试时本地图片仍能被重新收集上传 */
-    var content = editor.innerHTML;
-    localImgs.forEach(function (img) {
-      if (uploadMap[img.src]) {
-        content = content.split(img.src).join(uploadMap[img.src]);
-      }
-    });
-
-    /* 编辑保留原发布日期，更新日期为今天；新建两者都是当天 */
-    var updated = todayStr();
-    var meta = {
-      title: title,
-      date: date,
-      updated: editingFile ? updated : date,
-      category: category,
-      cover: finalCover
-    };
-
-    var html = renderPostHtml(meta, content);
-    filesToCommit.push({ path: 'posts/' + file, content: html });
-
-    /* 5. 更新 posts-list.json（cover 字段一起写，首页卡片列表要用到） */
-    var entry = {
-      title: title,
-      date: date,
-      updated: meta.updated,
-      file: file,
-      summary: summary,
-      category: category,
-      cover: finalCover || ''
-    };
-
-    var nextList;
-    if (editingFile && editingFile !== file) {
-      /* slug 改了：删掉旧文件名记录，按新文件新增 */
-      nextList = postsCache.filter(function (p) { return p.file !== editingFile; });
-      nextList.push(entry);
-    } else if (editingFile) {
-      nextList = postsCache.map(function (p) {
-        return p.file === file ? entry : p;
-      });
-    } else {
-      nextList = postsCache.concat([entry]);
-    }
-    filesToCommit.push({
-      path: 'posts-list.json',
-      content: JSON.stringify(nextList, null, 2) + '\n'
-    });
-
-    /* 6. slug 变更时删除旧文章文件 */
-    var deletes = (editingFile && editingFile !== file) ? ['posts/' + editingFile] : [];
-
-    var action = editingFile ? 'edit' : 'new';
-    var oldFile = editingFile;
-
-    commitFiles(filesToCommit, deletes,
-      'post(' + (action === 'edit' ? 'edit' : 'new') + '): ' + title
-    ).then(function () {
-      /* 提交成功后，才把 DOM 中的本地图片真正换成相对路径 */
-      localImgs.forEach(function (img) {
-        if (uploadMap[img.src]) img.src = uploadMap[img.src];
-      });
-      editingFile = file;
-      coverDataURL = null;
-      coverRemote = finalCover;
-      postsCache = nextList.slice().sort(function (a, b) {
-        return new Date(b.date) - new Date(a.date);
-      });
-      /* 封面预览更新为远程状态 */
-      if (finalCover) {
-        $('cover-preview').innerHTML =
-          '<img src="' + escapeHTML(ROOT + finalCover.replace(/^\.\.\//, '')) + '" alt="封面">' +
-          '<div class="cover-tip">当前封面，不更换则保持不变</div>';
-      }
-      btn.disabled = false;
-      btn.textContent = SAVE_TEXT;
-      toast('保存成功！GitHub Pages 通常 1~2 分钟后生效');
-    }).catch(function (err) {
-      btn.disabled = false;
-      btn.textContent = SAVE_TEXT;
-      /* DOM 中仍是本地 dataURL，修正问题后可直接再次点保存 */
-      toast('保存失败：' + err.message, true);
-      console.error(err);
+    /* 统一写入浏览器 localStorage，不直接访问 GitHub */
+    saveLocalPost({
+      title: title, slug: slug, date: date, category: category,
+      summary: summary, coverUrl: coverUrlInput, file: file
     });
   }
 
-  /* 本地模式保存：文章与封面全部写入浏览器 localStorage，不访问 GitHub。
+  /* 本地保存：文章与封面全部写入浏览器 localStorage，不直接写 GitHub。
      图片不做上传，dataURL 直接内嵌在内容里（受 localStorage 约 5MB 限制） */
   function saveLocalPost(v) {
     var btn = $('btn-save');
@@ -1036,7 +890,7 @@
     }
     btn.disabled = false;
     btn.textContent = SAVE_TEXT;
-    toast('已保存到本浏览器（本地模式），可在前台直接预览');
+    toast('已保存到本浏览器，可在前台直接预览');
   }
 
   /* 文章 HTML 模板（与 posts/welcome.html 结构保持一致） */
@@ -1086,8 +940,8 @@
   /* ============================================================
      站点设置（表单 UI）
      管理 site-config.json + search-engines / quotes / nav-links 三个首页应用。
-     线上模式：有改动的文件通过一次 Git Trees commit 提交，需 PAT；
-     本地模式：写入 localStorage 覆盖键，前台 common.js / apps.js 读取时优先使用
+     保存只写入 localStorage 覆盖键并登记待提交，前台读取时优先使用；
+     统一到「提交管理」里向 GitHub 提交
      ============================================================ */
   var siteLoaded = false;
   var siteData = null;   /* 最近一次加载的快照（保存成功后同步），用于差异比较 */
@@ -1263,7 +1117,6 @@
       siteLoaded = true;
       fillSiteForm(siteData);
       bindSiteSettingsEvents();
-      $('btn-site-reset').classList.toggle('hidden', !isLocalMode());
     }).catch(function (err) {
       $('site-card').innerHTML = '<div class="site-loading">加载失败：' +
         escapeHTML(err.message) + '</div>';
@@ -1439,13 +1292,7 @@
     var data = collectSiteData();
     if (data.error) { showSiteMsg(data.error, true); return; }
 
-    if (!isLocalMode() && !pat) {
-      toast('请先到「登录」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
-
-    /* 差异比较：只提交 site-config.json */
+    /* 差异比较：没有改动直接返回 */
     if (JSON.stringify(data.config) === JSON.stringify(siteData.config || {})) {
       showSiteMsg('没有检测到改动', false);
       return;
@@ -1456,48 +1303,26 @@
     btn.textContent = '保存中…';
     showSiteMsg('');
 
-    if (isLocalMode()) {
-      try {
-        localStorage.setItem(LS_SITE_KEY, JSON.stringify(data.config, null, 2));
-        pendingMark(SITE_FILES.config, '站点配置', '站点配置');
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = '保存设置';
-        showSiteMsg('保存失败：浏览器 localStorage 空间不足', true);
-        return;
-      }
-      commitLoaded = false;
-      config = data.config;    /* 同步后台内存配置（保存文章时站点名等要用最新值） */
-      $('admin-brand').textContent = config.siteName ? config.siteName + ' · 管理' : '管理后台';
-      siteData = { config: data.config };
+    try {
+      localStorage.setItem(LS_SITE_KEY, JSON.stringify(data.config, null, 2));
+      pendingMark(SITE_FILES.config, '站点配置', '站点配置');
+    } catch (e) {
       btn.disabled = false;
       btn.textContent = '保存设置';
-      showSiteMsg('已保存到本浏览器，刷新前台即可看到效果', false);
-      toast('站点设置已保存（本地模式）');
-      /* site-config.json 同时被「应用管理」编辑（heroNotice 等字段），
-         保存后使其快照失效，下次进入重新加载 */
-      appsLoaded = false;
+      showSiteMsg('保存失败：浏览器 localStorage 空间不足', true);
       return;
     }
-
-    /* 线上模式：单文件提交 */
-    commitFiles(
-      [{ path: SITE_FILES.config, content: JSON.stringify(data.config, null, 2) + '\n' }],
-      [], 'site: update settings'
-    ).then(function () {
-      config = data.config;
-      $('admin-brand').textContent = config.siteName ? config.siteName + ' · 管理' : '管理后台';
-      siteData = { config: data.config };
-      btn.disabled = false;
-      btn.textContent = '保存设置';
-      showSiteMsg('保存成功！GitHub Pages 通常 1~2 分钟后生效', false);
-      toast('站点设置已提交到 GitHub');
-      appsLoaded = false;
-    }).catch(function (err) {
-      btn.disabled = false;
-      btn.textContent = '保存设置';
-      showSiteMsg('保存失败：' + err.message, true);
-    });
+    commitLoaded = false;
+    config = data.config;    /* 同步后台内存配置（保存文章时站点名等要用最新值） */
+    $('admin-brand').textContent = config.siteName ? config.siteName + ' · 管理' : '管理后台';
+    siteData = { config: data.config };
+    btn.disabled = false;
+    btn.textContent = '保存设置';
+    showSiteMsg('已保存到本浏览器，刷新前台即可看到效果', false);
+    toast('站点设置已保存');
+    /* site-config.json 同时被「应用管理」编辑（heroNotice 等字段），
+       保存后使其快照失效，下次进入重新加载 */
+    appsLoaded = false;
   }
 
   /* ============================================================
@@ -2216,8 +2041,8 @@
 
   function pageFileHint(p) {
     if (isBuiltinPage(p)) return '内置静态文件：' + escapeHTML(p.file);
-    if (isLocalMode()) return '本地模式：动态页 page.html?slug=' + escapeHTML(p.id);
-    return '保存时生成静态文件：page-' + escapeHTML(p.id) + '.html';
+    /* 自建页统一走动态页 page.html?slug=，无需在仓库生成静态外壳 */
+    return '动态页：page.html?slug=' + escapeHTML(p.id);
   }
 
   function renderPageEditor() {
@@ -2428,7 +2253,6 @@
       renderPagesList();
       renderRespLib();
       pagesLoaded = true;
-      $('btn-pages-reset').classList.toggle('hidden', !isLocalMode());
     }).catch(function (err) {
       $('pages-list').innerHTML = '<div class="card site-card"><div class="site-loading">加载失败：' +
         escapeHTML(err.message) + '</div></div>';
@@ -2445,10 +2269,10 @@
     var err = validatePages(pagesWork);
     if (err) return { error: err };
 
-    /* 自建页文件名按 id 规范化：内置三页锁死；本地模式留空走 page.html?slug=；
-       线上模式 page-<slug>.html（id 改动即改名：旧文件在保存时删除、新文件生成） */
+    /* 自建页 file 统一留空：走动态页 page.html?slug=，
+       不在仓库生成静态外壳；内置三页的 file 锁死不动 */
     pagesWork.forEach(function (p) {
-      if (!isBuiltinPage(p)) p.file = isLocalMode() ? '' : 'page-' + p.id + '.html';
+      if (!isBuiltinPage(p)) p.file = '';
     });
 
     /* 基于整份快照深拷贝（保留 _comment 等表外字段），
@@ -2518,12 +2342,6 @@
     var data = collectPagesData();
     if (data.error) { showPagesMsg(data.error, true); return; }
 
-    if (!isLocalMode() && !pat) {
-      toast('请先到「登录」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
-
     /* 差异比较：整份 JSON 无变化就不提交 */
     if (JSON.stringify(data) === JSON.stringify(pagesData)) {
       showPagesMsg('没有检测到改动', false);
@@ -2535,108 +2353,26 @@
     btn.textContent = '保存中…';
     showPagesMsg('');
 
-    if (isLocalMode()) {
-      try {
-        localStorage.setItem(LS_APP_PREFIX + 'pages', JSON.stringify(data, null, 2));
-        pendingMark('pages.json', '页面结构', '页面结构');
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = '保存页面';
-        showPagesMsg('保存失败：浏览器 localStorage 空间不足（富文本内嵌图片过大时也会如此，可改用线上模式上传图片）', true);
-        return;
-      }
-      commitLoaded = false;
-      pagesData = data;
-      pagesWork = JSON.parse(JSON.stringify(data.pages));
-      respWork = JSON.parse(JSON.stringify(data.responsive || { templates: [] }));
+    try {
+      localStorage.setItem(LS_APP_PREFIX + 'pages', JSON.stringify(data, null, 2));
+      pendingMark('pages.json', '页面结构', '页面结构');
+    } catch (e) {
       btn.disabled = false;
       btn.textContent = '保存页面';
-      if (editIndex >= 0) renderPageEditor();
-      showPagesMsg('已保存到本浏览器，刷新前台即可看到效果', false);
-      toast('页面管理已保存（本地模式）');
-      /* pages.json 的 apps 节点同时被「应用管理」编辑，保存后使其快照失效 */
-      appsLoaded = false;
+      showPagesMsg('保存失败：浏览器 localStorage 空间不足（富文本内嵌图片过大时也会如此）', true);
       return;
     }
-
-    /* 线上模式：先把富文本中的本地图片收集上传并替换为仓库相对路径，
-       再提交 pages.json；新建自建页面同时生成静态 HTML（三模板外壳已统一）；
-       被删除（或改名）的 page-*.html 一并从仓库移除 */
-    var uploads = collectRichImageUploads(data.pages);
-    applyRichImageReplacements(data.pages, uploads.map);
-
-    var snapPages = pagesData.pages || [];
-    var snapFiles = [];
-    snapPages.forEach(function (p) { if (p.file) snapFiles.push(p.file); });
-    var curFiles = [];
-    data.pages.forEach(function (p) { if (p.file) curFiles.push(p.file); });
-
-    var files = uploads.files.slice();
-    files.push({ path: 'pages.json', content: JSON.stringify(data, null, 2) + '\n' });
-    var deletes = snapFiles.filter(function (f) {
-      return curFiles.indexOf(f) === -1 && /^page-.+\.html$/.test(f);
-    });
-    var newHtmlCount = 0;
-    data.pages.forEach(function (p) {
-      /* 只处理自建页的静态文件；内置三页的 HTML 由仓库直接维护。
-         外壳统一后仅「快照里不存在该文件」（新建 / 改名后）才需生成 */
-      if (!p.file || !/^page-.+\.html$/.test(p.file)) return;
-      if (snapFiles.indexOf(p.file) === -1) {
-        files.push({ path: p.file, content: renderPageHtml(p) });
-        newHtmlCount += 1;
-      }
-    });
-
-    commitFiles(files, deletes, 'pages: update pages config').then(function () {
-      pagesData = data;
-      /* 工作副本同步为已替换图片路径的形态并重渲染，避免重复保存时重复上传图片 */
-      pagesWork = JSON.parse(JSON.stringify(data.pages));
-      respWork = JSON.parse(JSON.stringify(data.responsive || { templates: [] }));
-      btn.disabled = false;
-      btn.textContent = '保存页面';
-      if (editIndex >= 0) renderPageEditor(); else { renderPagesList(); renderRespLib(); }
-      var extra = [];
-      if (newHtmlCount) extra.push(newHtmlCount + ' 个新页面文件');
-      if (uploads.files.length) extra.push(uploads.files.length + ' 张图片');
-      showPagesMsg('保存成功！GitHub Pages 通常 1~2 分钟后生效' +
-        (extra.length ? '（含 ' + extra.join('、') + '）' : ''), false);
-      toast('页面管理已提交到 GitHub');
-      appsLoaded = false;
-    }).catch(function (err) {
-      btn.disabled = false;
-      btn.textContent = '保存页面';
-      showPagesMsg('保存失败：' + err.message, true);
-    });
-  }
-
-  /* 按模板生成自建页面 HTML（结构对齐仓库的 index/archives/about 三个模板）。
-     页面标题由 apps.js 从 pages.json 动态写入 #page-title 与 document.title，
-     静态文件里的标题仅作 JS 未加载时的兜底 */
-  /* v3：三种模板共用统一外壳，屏/盒/板块全部由 apps.js 按 pages.json 渲染。
-     静态文件之间唯一的差别只剩文件名本身（apps.js 按文件名找页面配置） */
-  function renderPageHtml(p) {
-    var title = escapeHTML(p.title);
-    return '<!DOCTYPE html>\n' +
-'<html lang="zh-CN">\n' +
-'<head>\n' +
-'  <meta charset="UTF-8">\n' +
-'  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-'  <title>' + title + ' - ' + escapeHTML(config.siteName || '') + '</title>\n' +
-'  <link rel="stylesheet" href="../assets/css/common.css">\n' +
-'  <link rel="stylesheet" href="../assets/css/home.css">\n' +
-'  <link rel="stylesheet" href="../assets/css/archives.css">\n' +
-'  <link rel="stylesheet" href="../assets/css/post.css">\n' +
-'</head>\n' +
-'<body>\n' +
-'  <header id="site-header"></header>\n\n' +
-'  <main id="app-screens"></main>\n\n' +
-'  <footer id="site-footer"></footer>\n\n' +
-'  <script src="../assets/js/common.js"><\/script>\n' +
-'  <script src="../assets/js/apps.js"><\/script>\n' +
-'  <script src="../assets/js/screen-scroll.js"><\/script>\n' +
-'  <script src="../assets/js/context-menu.js"><\/script>\n' +
-'</body>\n' +
-'</html>\n';
+    commitLoaded = false;
+    pagesData = data;
+    pagesWork = JSON.parse(JSON.stringify(data.pages));
+    respWork = JSON.parse(JSON.stringify(data.responsive || { templates: [] }));
+    btn.disabled = false;
+    btn.textContent = '保存页面';
+    if (editIndex >= 0) renderPageEditor();
+    showPagesMsg('已保存到本浏览器，刷新前台即可看到效果', false);
+    toast('页面管理已保存');
+    /* pages.json 的 apps 节点同时被「应用管理」编辑，保存后使其快照失效 */
+    appsLoaded = false;
   }
 
   /* ---------- 新建页面 / 复制页面 ---------- */
@@ -2664,20 +2400,18 @@
       return;
     }
 
-    /* v3：新页面直接带默认屏/盒/板块结构；本地模式留空 file 走动态页，
-       线上模式在保存时生成 page-<slug>.html */
+    /* v3：新页面直接带默认屏/盒/板块结构；file 留空走动态页 page.html?slug= */
     var np = {
       id: slug,
       title: title,
       template: tpl,
-      file: isLocalMode() ? '' : 'page-' + slug + '.html',
+      file: '',
       screens: defaultScreens(tpl)
     };
 
     pagesWork.push(np);
     $('page-new-card').classList.add('hidden');
-    showPagesMsg('页面已创建，编辑完成后点击「保存页面」' +
-      (isLocalMode() ? '' : '，保存时会自动生成 ' + np.file), false);
+    showPagesMsg('页面已创建，编辑完成后点击「保存页面」', false);
     openPageEditor(pagesWork.length - 1);
   }
 
@@ -2694,7 +2428,7 @@
     var clone = JSON.parse(JSON.stringify(src));
     clone.id = id;
     clone.title = src.title + ' 副本';
-    clone.file = isLocalMode() ? '' : 'page-' + id + '.html';
+    clone.file = '';
     regenerateUIDs(clone);
     pagesWork.push(clone);
     renderPagesList();
@@ -3008,13 +2742,11 @@
   /* ---------- 应用代码读取（admin 在二级目录，fetch 统一加 ROOT='../'） ---------- */
 
   function adminReadAppCode(id) {
-    /* 本地模式：后台编辑保存的 localStorage 覆盖优先于文件 */
-    if (isLocalMode()) {
-      try {
-        var raw = localStorage.getItem(window.SSBApps.appCodeKey + id);
-        if (raw != null) return Promise.resolve(raw);
-      } catch (e) {}
-    }
+    /* 后台编辑保存的 localStorage 覆盖优先于仓库文件 */
+    try {
+      var raw = localStorage.getItem(window.SSBApps.appCodeKey + id);
+      if (raw != null) return Promise.resolve(raw);
+    } catch (e) {}
     return fetch(ROOT + window.SSBApps.appsDir + encodeURIComponent(id) + '.js',
                  { cache: 'no-cache' })
       .then(function (res) {
@@ -3029,7 +2761,6 @@
     var base = {
       ROOT: ROOT,
       config: config || {},
-      isLocalMode: function () { return false; },
       escapeHTML: escapeHTML,
       loadDataFile: function () { return Promise.resolve(null); }
     };
@@ -3155,7 +2886,6 @@
           data: data
         };
         appsLoaded = true;
-        $('btn-apps-reset').classList.toggle('hidden', !isLocalMode());
         showAppsList();
       });
     }).catch(function (err) {
@@ -3214,17 +2944,15 @@
     $('app-edit-wrap').classList.remove('hidden');
     $('btn-ae-delete').classList.toggle('hidden', d.builtin);
     syncRestoreBtn();
-    /* 本地模式探测仓库中是否存在同文件（决定能否「恢复仓库代码」） */
-    if (isLocalMode()) {
-      fetch(ROOT + window.SSBApps.appsDir + encodeURIComponent(id) + '.js',
-            { method: 'GET', cache: 'no-cache' })
-        .then(function (res) {
-          if (appEdit && appEdit.id === id) {
-            appEdit.repoHasCode = res.ok;
-            syncRestoreBtn();
-          }
-        }).catch(function () {});
-    }
+    /* 探测仓库中是否存在同文件（决定能否「恢复仓库代码」） */
+    fetch(ROOT + window.SSBApps.appsDir + encodeURIComponent(id) + '.js',
+          { method: 'GET', cache: 'no-cache' })
+      .then(function (res) {
+        if (appEdit && appEdit.id === id) {
+          appEdit.repoHasCode = res.ok;
+          syncRestoreBtn();
+        }
+      }).catch(function () {});
     $('ae-code').value = d.code || '';
     showAppsMsg('');
     renderAppTabs();
@@ -3234,7 +2962,7 @@
     window.scrollTo(0, 0);
   }
 
-  /* 「恢复仓库代码」仅本地模式可用：本浏览器对该应用代码有覆盖、
+  /* 「恢复仓库代码」：本浏览器对该应用代码有覆盖、
      且仓库里存在同文件时才显示。参数/数据不受此按钮影响 */
   function syncRestoreBtn() {
     if (!appEdit) return;
@@ -3242,7 +2970,7 @@
     try {
       hasLocal = localStorage.getItem(window.SSBApps.appCodeKey + appEdit.id) != null;
     } catch (e) {}
-    var show = isLocalMode() && hasLocal && !!appEdit.repoHasCode;
+    var show = hasLocal && !!appEdit.repoHasCode;
     $('btn-ae-restore').classList.toggle('hidden', !show);
   }
 
@@ -3520,7 +3248,7 @@
     return { def: def, code: code, patch: patch, dataFile: dataFile, dataOut: dataOut };
   }
 
-  /* 本地模式提交路径 → localStorage 键（与前台 apps.js / common.js 约定一致） */
+  /* 仓库提交路径 → localStorage 键（与前台 apps.js / common.js 约定一致） */
   function localAppKey(path) {
     if (path === MANIFEST_PATH) return LS_APP_PREFIX + 'applications/applications';
     if (path === 'pages.json') return LS_APP_PREFIX + 'pages';
@@ -3536,11 +3264,6 @@
     if (!appEdit || !appsData) return;
     var c = collectAppEditor();
     if (c.error) { showAppsMsg(c.error, true); return; }
-    if (!isLocalMode() && !pat) {
-      toast('请先到「登录」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
 
     var id = appEdit.id;
     var files = [];
@@ -3620,34 +3343,23 @@
       var activeTab = document.querySelector('.ae-tab.active');
       switchAppTab(activeTab ? activeTab.dataset.tab : 'code');
       showAppsMsg('已保存 ' + files.length + ' 个文件，刷新前台即可看到效果', false);
-      toast(isLocalMode() ? '应用已保存（本地模式）' : '应用已提交到 GitHub');
+      toast('应用已保存');
     }
 
-    if (isLocalMode()) {
-      try {
-        files.forEach(function (f) {
-          localStorage.setItem(localAppKey(f.path), f.content);
-          /* 登记到待提交区（渲染时会与仓库版对比，无差异自动剔除） */
-          pendingMark(f.path, appPendingTitle(f.path, id), pendingGroup(f.path));
-        });
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = '保存';
-        showAppsMsg('保存失败：浏览器 localStorage 空间不足', true);
-        return;
-      }
-      commitLoaded = false;
-      done();
+    try {
+      files.forEach(function (f) {
+        localStorage.setItem(localAppKey(f.path), f.content);
+        /* 登记到待提交区（渲染时会与仓库版对比，无差异自动剔除） */
+        pendingMark(f.path, appPendingTitle(f.path, id), pendingGroup(f.path));
+      });
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '保存';
+      showAppsMsg('保存失败：浏览器 localStorage 空间不足', true);
       return;
     }
-
-    commitFiles(files, [], 'apps: update application "' + id + '"')
-      .then(done)
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = '保存';
-        showAppsMsg('保存失败：' + err.message, true);
-      });
+    commitLoaded = false;
+    done();
   }
 
   /* ---------- 删除自定义应用 / 恢复仓库代码 ---------- */
@@ -3678,12 +3390,6 @@
     msg += '\n全局参数与数据文件内容保留在原处，不会一起删除。';
     if (!confirm(msg)) return;
 
-    if (!isLocalMode() && !pat) {
-      toast('请先到「登录」中填写 PAT', true);
-      showView('settings');
-      return;
-    }
-
     var mf = JSON.parse(JSON.stringify(adminManifest));
     mf.apps = mf.apps.filter(function (m) { return m.id !== id; });
     var files = [];
@@ -3700,28 +3406,21 @@
       showAppsList();
     }
 
-    if (isLocalMode()) {
-      try {
-        files.forEach(function (f) {
-          localStorage.setItem(localAppKey(f.path), f.content);
-          /* 清单改动登记待提交；代码文件删除另存到 deletes 待提交区 */
-          pendingMark(f.path, '应用清单', pendingGroup(f.path));
-        });
-        localStorage.removeItem(window.SSBApps.appCodeKey + id);
-        pendingDelete(window.SSBApps.appsDir + id + '.js',
-                      '应用代码 ' + id, '应用代码');
-      } catch (e) {
-        showAppsMsg('删除失败：localStorage 写入异常', true);
-        return;
-      }
-      commitLoaded = false;
-      done();
+    try {
+      files.forEach(function (f) {
+        localStorage.setItem(localAppKey(f.path), f.content);
+        /* 清单改动登记待提交；代码文件删除另存到 deletes 待提交区 */
+        pendingMark(f.path, '应用清单', pendingGroup(f.path));
+      });
+      localStorage.removeItem(window.SSBApps.appCodeKey + id);
+      pendingDelete(window.SSBApps.appsDir + id + '.js',
+                    '应用代码 ' + id, '应用代码');
+    } catch (e) {
+      showAppsMsg('删除失败：localStorage 写入异常', true);
       return;
     }
-
-    commitFiles(files, [window.SSBApps.appsDir + id + '.js'], 'apps: delete application "' + id + '"')
-      .then(done)
-      .catch(function (err) { showAppsMsg('删除失败：' + err.message, true); });
+    commitLoaded = false;
+    done();
   }
 
   /* 丢弃本浏览器中对应用代码的修改，恢复为仓库文件（不触碰参数/数据） */
@@ -3729,7 +3428,7 @@
     if (!appEdit) return;
     var id = appEdit.id;
     var d = adminRegistry[id];
-    if (!d || !isLocalMode()) return;
+    if (!d) return;
     if (!confirm('丢弃本浏览器中对应用「' + (d.name || id) + '」代码的修改，\n' +
                  '恢复为仓库文件 applications/' + id + '.js？\n参数与数据不受影响。')) return;
 
@@ -3845,9 +3544,9 @@
   }
 
   /* ============================================================
-     提交管理（本地模式）
+     提交管理
      ------------------------------------------------------------
-     本地保存点同时把仓库路径登记到 ssb.local.pending 暂存区；
+     所有保存点同时把仓库路径登记到 ssb.local.pending 暂存区；
      打开面板时逐条与仓库最新版本对比，无差异自动剔除。
      用户勾选条目 → 组装文件（文章/页面的内嵌图片会抽出上传、
      自动套用线上模板）→ commitFiles 一次提交 → 清理本地覆盖。
@@ -4072,7 +3771,7 @@
     if (!rows.length) {
       wrap.innerHTML =
         '<div class="card cm-empty">本浏览器中暂无待提交改动。<br>' +
-        '在本地模式写文章、改应用或改配置并保存后，改动会出现在这里。</div>';
+        '写文章、改应用或改配置并保存后，改动会出现在这里。</div>';
       return;
     }
 
@@ -4186,7 +3885,7 @@
   }
 
   /* 单篇本地文章 → 提交文件（HTML + 抽出的图片 blob），
-     逻辑与线上模式 savePost 完全一致；返回 Promise<{files, entry}> */
+     提交时把本地条目组装为线上形态；返回 Promise<{files, entry}> */
   function buildPostCommit(file) {
     var item = readLocalList().filter(function (p) { return p.file === file; })[0];
     var rawContent = localStorage.getItem(LS_CONTENT_KEY + file) || '';
@@ -4236,8 +3935,9 @@
     return Promise.resolve({ files: files, entry: cleanPostEntry(item, finalCover) });
   }
 
-  /* pages.json → 提交文件：富文本图片上传、新自建页补 file 并生成静态外壳、
-     已删自建页外壳进 deletes */
+  /* pages.json → 提交文件：富文本图片抽出上传。
+     自建页统一走动态页 page.html?slug=（file 为空），不生成静态外壳；
+     仓库基线中残留的旧 page-*.html 外壳（旧工作流产物）随本次提交删除 */
   function buildPagesCommit() {
     var data = JSON.parse(pendingLocalText('pages.json'));
     var clone = JSON.parse(JSON.stringify(data));
@@ -4245,26 +3945,17 @@
     var uploads = collectRichImageUploads(clone.pages || []);
     applyRichImageReplacements(clone.pages || [], uploads.map);
 
-    var baseParsed = { pages: [] };
+    var basePageFiles = [];
     if (commitBase['pages.json']) {
-      try { baseParsed = JSON.parse(commitBase['pages.json']); } catch (e) {}
+      try {
+        basePageFiles = (JSON.parse(commitBase['pages.json']).pages || [])
+          .map(function (p) { return p.file; }).filter(Boolean);
+      } catch (e) {}
     }
-    var baseIds = (baseParsed.pages || []).map(function (p) { return p.id; });
-    var basePageFiles = (baseParsed.pages || []).map(function (p) { return p.file; })
-      .filter(Boolean);
-
-    /* 本地新建的自建页（基线里没有同 id）提交时补静态文件名 */
-    (clone.pages || []).forEach(function (p) {
-      if (!p.file && baseIds.indexOf(p.id) === -1) p.file = 'page-' + p.id + '.html';
-    });
 
     var files = uploads.files.slice();
     files.push({ path: 'pages.json', content: JSON.stringify(clone, null, 2) + '\n' });
-    (clone.pages || []).forEach(function (p) {
-      if (p.file && /^page-.+\.html$/.test(p.file) && basePageFiles.indexOf(p.file) === -1) {
-        files.push({ path: p.file, content: renderPageHtml(p) });
-      }
-    });
+    /* 基线里旧工作流生成的 page-*.html，新 pages.json 已不再引用 → 删除 */
     var deletes = basePageFiles.filter(function (f) {
       return /^page-.+\.html$/.test(f) &&
         !(clone.pages || []).some(function (p) { return p.file === f; });
@@ -4302,9 +3993,8 @@
     picked.forEach(function (cb) { ops[cb.dataset.path] = cb.dataset.op; });
     var autoNotes = [];
 
-    /* 依赖自动补齐：勾了文章必须连同文章列表；删应用必须连同应用清单 */
-    if (paths.some(isPostHtmlPath) && paths.indexOf('posts-list.json') === -1 &&
-        commitRows.some(function (r) { return r.path === 'posts-list.json'; })) {
+    /* 依赖自动补齐：文章新增/编辑/删除都必须连同文章列表；删应用必须连同应用清单 */
+    if (paths.some(isPostHtmlPath) && paths.indexOf('posts-list.json') === -1) {
       paths.push('posts-list.json');
       autoNotes.push('文章列表 posts-list.json');
     }
@@ -4332,7 +4022,7 @@
     var confirmText = '将向 GitHub 仓库 ' + config.repo + '（' + (config.branch || 'main') +
       '）提交 ' + paths.length + ' 个改动。\n\n提交说明：' + msg +
       (nPosts ? '\n文章内嵌图片会一并上传。' : '') +
-      (nPages ? '\n页面中的内嵌图片会一并上传，并生成自建页面的静态文件。' : '') +
+      (nPages ? '\n页面中的内嵌图片会一并上传，旧的静态页面外壳会被清理。' : '') +
       (autoNotes.length ? '\n\n已自动补齐必选项：' + autoNotes.join('、') : '') +
       '\n\n提交成功后，本地覆盖会被清除并刷新页面。确定继续？';
     if (!confirm(confirmText)) return;
@@ -4345,6 +4035,10 @@
     /* 组装全部文件 */
     var jobs = paths.map(function (p) {
       if (isPostHtmlPath(p)) {
+        /* 删除登记没有本地正文，不组装文件，只占位供列表剔除 */
+        if (ops[p] === 'del') {
+          return Promise.resolve({ kind: 'post-del', path: p });
+        }
         return buildPostCommit(p.slice('posts/'.length)).then(function (r) {
           return { kind: 'post', path: p, files: r.files, entry: r.entry };
         });
@@ -4379,12 +4073,19 @@
         if (cb.dataset.op === 'del') deletes.push(cb.dataset.path);
       });
 
-      /* 文章列表：仓库基线 + 仅本次勾选的文章，覆盖普通文件项 */
+      /* 文章列表：仓库基线 + 本次勾选文章覆盖 - 本次删除文章 */
       if (paths.indexOf('posts-list.json') !== -1) {
         var selectedEntries = results.filter(function (r) {
           return r.kind === 'post';
         }).map(function (r) { return r.entry; });
-        var list = buildCommittedPostList(selectedEntries);
+        var deletedFiles = {};
+        picked.forEach(function (cb) {
+          if (cb.dataset.op === 'del' && isPostHtmlPath(cb.dataset.path)) {
+            deletedFiles[cb.dataset.path.slice('posts/'.length)] = 1;
+          }
+        });
+        var list = buildCommittedPostList(selectedEntries)
+          .filter(function (e) { return !deletedFiles[e.file]; });
         files = files.filter(function (f) { return f.path !== 'posts-list.json'; });
         files.push({ path: 'posts-list.json', content: JSON.stringify(list, null, 2) + '\n' });
       }
@@ -4438,6 +4139,21 @@
       loadCommitPanel();
     });
     $('btn-cm-submit').addEventListener('click', submitCommit);
+    /* 清空本地数据：删掉本浏览器中全部 ssb.* 站点数据
+       （文章/正文/配置/应用代码/待提交登记），页面随即回到仓库线上状态 */
+    $('btn-cm-clearall').addEventListener('click', function () {
+      if (!confirm('确定清空本浏览器中的全部站点数据吗？\n' +
+                   '包括未提交的文章、配置修改、应用代码与待提交登记，且无法恢复。')) return;
+      var keys = [];
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('ssb.') === 0) keys.push(k);
+        }
+        keys.forEach(function (k) { localStorage.removeItem(k); });
+      } catch (e) {}
+      location.reload();
+    });
     $('cm-pat').addEventListener('input', function (e) {
       pat = e.target.value.trim();
     });
@@ -4481,7 +4197,7 @@
 
     $('btn-apps-new').addEventListener('click', createApp);
 
-    /* 本地模式：一键清掉所有应用代码覆盖 / 清单覆盖 / 数据覆盖（不动页面结构） */
+    /* 一键清掉所有应用代码覆盖 / 清单覆盖 / 数据覆盖（不动页面结构） */
     $('btn-apps-reset').addEventListener('click', function () {
       if (!confirm('确定清空本浏览器中所有应用代码的本地修改、自定义应用与应用数据，恢复为仓库文件吗？\n（页面结构请到「页面管理」单独恢复）')) return;
       try {
@@ -4564,26 +4280,6 @@
   }
 
   /* ============================================================
-     设置：PAT 与连接测试
-     ============================================================ */
-
-  function updatePatStatus() {
-    var el = $('pat-status');
-    if (isLocalMode()) {
-      el.className = 'pat-status ok';
-      el.innerHTML = '<i></i>本地模式（无需 PAT）';
-      return;
-    }
-    if (!pat) {
-      el.className = 'pat-status';
-      el.innerHTML = '<i></i>未连接';
-    } else {
-      el.className = 'pat-status warn';
-      el.innerHTML = '<i></i>PAT 已填写（未验证）';
-    }
-  }
-
-  /* ============================================================
      顶栏 localStorage 用量指示
      localStorage 容量按字符数（UTF-16）估算，浏览器常见上限 ~5MB。
      仅统计本站前缀 ssb. 的键，展示「已用 / 配额」与百分比进度。
@@ -4621,45 +4317,6 @@
       'localStorage 上限约 5MB；接近上限时请到「提交管理」提交或丢弃本地改动以释放空间';
   }
 
-  function testConnection() {
-    if (isLocalMode()) {
-      showMsg('当前为本地模式（site-config.json 的 localMode = true），文章保存在本浏览器中，无需连接 GitHub。', false);
-      return;
-    }
-    if (!config.repo || config.repo === 'your-name/your-repo') {
-      showMsg('请先修改 site-config.json 中的 repo 字段为你的 owner/repo', true);
-      return;
-    }
-    var rp = repoParts();
-    var msgEl = $('set-msg');
-    msgEl.className = 'form-msg';
-    msgEl.textContent = '测试中…';
-
-    gh('/repos/' + rp.owner + '/' + rp.name).then(function (repo) {
-      if (!pat) {
-        showMsg('可以匿名读取仓库（每小时有限额）。写入文章仍需填写 PAT。', true);
-        return;
-      }
-      /* 再验证一下 token 本身是否有效 */
-      return gh('/user').then(function (user) {
-        msgEl.className = 'form-msg ok';
-        msgEl.textContent = '连接成功：仓库 ' + repo.full_name + '，Token 属于 ' +
-          (user.login || '?') + '，可以写文章了。';
-        var el = $('pat-status');
-        el.className = 'pat-status ok';
-        el.innerHTML = '<i></i>已连接（' + escapeHTML(user.login || '') + '）';
-      });
-    }).catch(function (err) {
-      showMsg('连接失败：' + err.message, true);
-    });
-  }
-
-  function showMsg(text, isErr) {
-    var el = $('set-msg');
-    el.className = 'form-msg ' + (isErr ? 'err' : 'ok');
-    el.textContent = text;
-  }
-
   /* ============================================================
      初始化与事件绑定
      ============================================================ */
@@ -4688,19 +4345,6 @@
     });
     $('btn-preview').addEventListener('click', togglePreview);
     $('btn-save').addEventListener('click', savePost);
-
-    /* 设置 */
-    $('set-pat').addEventListener('input', function () {
-      pat = this.value.trim();
-      updatePatStatus();
-    });
-    $('btn-test').addEventListener('click', testConnection);
-    $('btn-clear-pat').addEventListener('click', function () {
-      pat = '';
-      $('set-pat').value = '';
-      updatePatStatus();
-      showMsg('PAT 已从内存清除。', false);
-    });
   }
 
   function init() {
@@ -4710,31 +4354,13 @@
         return res.json();
       })
       .then(function (cfg) {
-        /* 本地模式下，站点设置页保存的整份配置覆盖优先于仓库文件。
-           这样后台保存文章时用到的 siteName 等也是最新值 */
-        if (cfg.localMode) {
-          var localCfg = readLocalJSON(LS_SITE_KEY);
-          if (localCfg) cfg = localCfg;
-        }
+        /* 站点设置页保存的整份配置覆盖优先于仓库文件。
+           这样后台保存文章时用到的 siteName 等也是最新值；
+           访客浏览器无此键，自动回落仓库版本 */
+        var localCfg = readLocalJSON(LS_SITE_KEY);
+        if (localCfg) cfg = localCfg;
         config = cfg;
-        $('set-repo').value = config.repo || '';
-        $('set-branch').value = config.branch || 'main';
         $('admin-brand').textContent = config.siteName ? config.siteName + ' · 管理' : '管理后台';
-
-        /* 本地模式：保存按钮换文案，设置页隐藏 PAT 相关区块；
-           侧边栏显示「提交管理」入口（本地改动选择性提交到仓库） */
-        SAVE_TEXT = config.localMode ? '保存到本地' : '保存发布';
-        $('btn-save').textContent = SAVE_TEXT;
-        if (config.localMode) {
-          var notice = $('local-notice');
-          if (notice) notice.classList.remove('hidden');
-          ['pat-field', 'pat-actions', 'pat-help'].forEach(function (id) {
-            var el = $(id);
-            if (el) el.classList.add('hidden');
-          });
-          var navCommit = $('nav-commit');
-          if (navCommit) navCommit.classList.remove('hidden');
-        }
 
         /* 富文本编辑器：文章编辑器；页面编辑里的 rich-content 实例在每次渲染编辑页时动态绑定 */
         initRichEditor($('editor-toolbar'), $('editor-body'), $('image-file'));
@@ -4743,7 +4369,6 @@
         bindPagesEvents();
         bindAppsEvents();
         bindCommitEvents();
-        updatePatStatus();
         updateLsUsage();
         showView('posts');
         loadPosts();
