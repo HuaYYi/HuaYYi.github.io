@@ -418,6 +418,22 @@ body.toc-hidden .post-layout {
     transform: translateX(0);
   }
 
+  /* 目录抽屉遮罩：默认不挡点击，toc-open 时淡入。
+     z-index 94 低于抽屉 95，抽屉始终在遮罩之上 */
+  #toc-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 94;
+  }
+  body.toc-open #toc-mask {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .post-title {
     font-size: 25px;
   }

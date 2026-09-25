@@ -179,6 +179,20 @@
     }
   };
 
+  /* ---------- 目录抽屉遮罩（仅窄屏有样式）：
+     窄屏打开目录后，点链接以外的区域也要能关——
+     遮罩盖住正文，点击即移除 toc-open。
+     显隐纯靠 CSS 读 body.toc-open，JS 只管注入与点击关闭 */
+  function injectTOCMask() {
+    if (document.getElementById('toc-mask')) return;
+    var mask = document.createElement('div');
+    mask.id = 'toc-mask';
+    mask.addEventListener('click', function () {
+      document.body.classList.remove('toc-open');
+    });
+    document.body.appendChild(mask);
+  }
+
   /* ---------- 生成右侧目录 ---------- */
   function buildTOC(article) {
     var tocWrap = document.getElementById('post-toc');
@@ -190,6 +204,7 @@
       return;
     }
     window.SSBPost.hasTOC = true;
+    injectTOCMask();
 
     /* 给没有 id 的标题补一个锚点 id */
     headings.forEach(function (h, i) {
