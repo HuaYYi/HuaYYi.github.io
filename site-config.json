@@ -11,12 +11,7 @@
       "branch": "分支名，默认 main",
       "theme.primary": "主题色十六进制（如 #1d6ff2），common.js 自动派生 hover 深色和浅底高亮色注入 :root",
       "theme.dark": "暗色模式默认策略：auto=跟随系统外观 / light=默认亮色 / dark=默认暗色。用户在页面右上角的手动切换会记住选择并覆盖此默认值",
-      "background.type": "首页动态背景类型：particles=粒子动画 / image=静态图 / video=循环视频 / none=关闭",
-      "background.count": "粒子数量（particles 模式），默认 6，数量大吃性能",
-      "background.speed": "粒子速度倍率，默认 0.4，值越大飘得越快",
-      "background.size": "粒子大小范围 [最小半径, 最大半径]，默认 [25, 115]",
-      "background.color": "粒子颜色池。'auto'=自动取主题色+补充色；数组=['#xxx', '#yyy', ...]",
-      "background.src": "image/video 模式下的资源路径",
+      "背景": "首页/各屏背景（粒子动画 / 图片壁纸 / 循环视频）v4 起改为「背景类应用」，参数与数据不在本文件：applications/applications.json 中 kind=background 的应用即背景（后台「应用管理」维护粒子参数、壁纸图库、视频清单），各屏使用哪种背景由 data/pages.json 的 screen.bg 选择（后台「页面管理」）",
       "应用参数": "首页公告文字、名言打字速度、导航毛玻璃盒子等应用级参数不在本文件，统一在 data/pages.json 顶层 apps 节点（后台「应用管理」维护）",
       "social": "页脚收藏横条右侧的社交图标数组，每项 {name, icon, url}。icon=mail 时 url 直接填邮箱地址（mailto: 前缀可省略），访客点击弹窗展示地址供复制；icon=github 时为普通外链"
     }
@@ -34,14 +29,6 @@
   "theme": {
     "primary": "#1d6ff2",
     "dark": "auto"
-  },
-
-  "background": {
-    "type": "particles",
-    "count": 6,
-    "speed": 0.4,
-    "color": "auto",
-    "size": [25, 115]
   },
 
   "social": [

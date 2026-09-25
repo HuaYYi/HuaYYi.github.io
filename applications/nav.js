@@ -1,7 +1,7 @@
 /* ============================================================
    SSB 应用：网址导航（nav）
    数据文件：data/nav-links.json（[{category, links:[{name,url}]}]）
-   图标：显示 assets/icons/sites/<域名>.png 仓库内预抓取副本（同域快、
+   图标：显示 assets/icons/sites/<域名>.webp 仓库内预抓取副本（同域快、
    不受目标站拖累）；无本地图标/加载失败固定显示首字母徽章，
    前台不直连外站 favicon。后台保存时会自动为缺图标条目匹配。
    v3：每个实例独立的 tab/分页状态（zone.__navState），
@@ -442,10 +442,10 @@ html[data-theme="dark"] .nav-zone {
       if (href && !iconSrc) {
         try {
           var u = new URL(href);
-          /* 仓库内预抓取副本（assets/icons/sites/，同域部署、统一 64×64），
+          /* 仓库内预抓取副本（assets/icons/sites/，同域部署、统一 32×32 WebP），
              速度不受对方站点快慢影响——学 hao.uisdc.com；
              无本地图标的条目固定显示首字母徽章（img error 时兜底） */
-          iconSrc = U.ROOT + 'assets/icons/sites/' + u.hostname + '.png';
+          iconSrc = U.ROOT + 'assets/icons/sites/' + u.hostname + '.webp';
         } catch (e) {}
       }
       var tag = href ? 'a' : 'div';

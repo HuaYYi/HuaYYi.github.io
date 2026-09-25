@@ -94,20 +94,12 @@
     return btoa(bin);
   }
 
-  /* base64 -> UTF-8 字符串（GitHub Contents API 返回的文件内容） */
-  function base64ToUtf8(b64) {
-    var bin = atob(b64.replace(/\n/g, ''));
-    var bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-
-  /* 解析 dataURL：data:image/png;base64,xxxx */
+  /* 解析 dataURL：data:image/webp;base64,xxxx */
   function parseDataURL(url) {
     var m = /^data:([\w./+-]+);base64,([\s\S]*)$/.exec(url);
     if (!m) return null;
     var extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
-                   'image/webp': 'webp', 'image/bmp': 'bmp' };
+                   'image/webp': 'webp', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
     return { mime: m[1], b64: m[2], ext: extMap[m[1]] || 'png' };
   }
 
@@ -203,32 +195,14 @@
   }
 
   /* 读取仓库中的文本文件，返回 { text, sha }；文件不存在返回 null
-     优先走 GitHub API（永远是最新提交的内容）；
-     失败时（未配置仓库 / 本地预览 / 匿名限流 / 网络问题）回退到同源静态文件，
-     此时 sha 为 null（仅用于读取展示，不影响写入流程） */
+     全站统一相对路径：同源 fetch，本地服务器读本地文件，线上自然读线上部署
+     的仓库文件（dist 即仓库内容的构建产物），无需 GitHub API。
+     sha 恒为 null（写入走 Git Trees API，不依赖读取时的 sha） */
   function readRepoFile(path) {
-    var rp = repoParts();
-    var repoConfigured = rp.owner && rp.name && config.repo !== 'your-name/your-repo';
-
-    function viaAPI() {
-      if (!repoConfigured) return Promise.reject(new Error('仓库未配置'));
-      return gh('/repos/' + rp.owner + '/' + rp.name + '/contents/' + path +
-                '?ref=' + encodeURIComponent(config.branch))
-        .then(function (data) {
-          return { text: base64ToUtf8(data.content), sha: data.sha };
-        });
-    }
-
-    function viaStatic() {
-      return fetch(ROOT + path, { cache: 'no-cache' }).then(function (res) {
-        if (!res.ok) return null;
-        return res.text().then(function (t) { return { text: t, sha: null }; });
-      });
-    }
-
-    return viaAPI()
-      .catch(function () { return viaStatic(); })
-      .catch(function () { return null; });
+    return fetch(ROOT + path, { cache: 'no-cache' }).then(function (res) {
+      if (!res.ok) return null;
+      return res.text().then(function (t) { return { text: t, sha: null }; });
+    }).catch(function () { return null; });
   }
 
   /* Git Trees API：多个文件一次 commit
@@ -712,18 +686,54 @@
      图片：粘贴 / 选择 —— 先本地 dataURL 预览，保存时才上传
      ============================================================ */
 
+  /* 图片文件 → WebP dataURL（文章插图 / 封面 / 壁纸三处共用）：
+     长边超过 maxSide 时等比缩小后 canvas 重编码为 WebP——同画质下体积
+     通常比 PNG/JPEG 小 25~60%，现代浏览器全支持。文章图 maxSide=1024、
+     壁纸 maxSide=2560，清晰度足够且控制仓库体积。
+     GIF / SVG 原样直传：canvas 重编码会砍掉动画、丢失矢量特性 */
+  function fileToWebpDataURL(file, maxSide, quality) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        if (file.type === 'image/gif' || file.type === 'image/svg+xml') {
+          resolve(reader.result);
+          return;
+        }
+        var im = new Image();
+        im.onload = function () {
+          var w = im.naturalWidth, h = im.naturalHeight;
+          var scale = Math.min(1, maxSide / Math.max(w, h));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * scale));
+          c.height = Math.max(1, Math.round(h * scale));
+          var g = c.getContext('2d');
+          g.imageSmoothingEnabled = true;
+          g.imageSmoothingQuality = 'high';
+          g.drawImage(im, 0, 0, c.width, c.height);
+          try { resolve(c.toDataURL('image/webp', quality)); } catch (e) { reject(e); }
+        };
+        im.onerror = function () { reject(new Error('decode fail')); };
+        im.src = reader.result;
+      };
+      reader.onerror = function () { reject(new Error('read fail')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function insertImageFile(file, editor) {
     if (!file || !/^image\//.test(file.type)) {
       toast('请选择图片文件', true);
       return;
     }
-    var reader = new FileReader();
-    reader.onload = function () {
+    /* 摄入时就压成 WebP（长边≤1024），落库的 dataURL 即最终格式，
+       保存上传时按扩展名 .webp 直接出文件，无需二次转换 */
+    fileToWebpDataURL(file, 1024, 0.85).then(function (dataURL) {
       editor.focus();
-      var img = '<img src="' + reader.result + '" alt="">';
+      var img = '<img src="' + dataURL + '" alt="">';
       document.execCommand('insertHTML', false, img);
-    };
-    reader.readAsDataURL(file);
+    }).catch(function () {
+      toast('图片读取失败，请换一张试试', true);
+    });
   }
 
   /* 封面选择：仅暂存 + 预览，保存时上传（编辑器行为已移入 initRichEditor） */
@@ -739,16 +749,17 @@
         toast('请选择图片文件', true);
         return;
       }
-      var reader = new FileReader();
-      reader.onload = function () {
-        coverDataURL = reader.result;
+      /* 与正文插图同一管线：摄入即 WebP（长边≤1024），保存时直接出 .webp 文件 */
+      fileToWebpDataURL(file, 1024, 0.85).then(function (dataURL) {
+        coverDataURL = dataURL;
         coverRemote = '';
         $('f-cover-url').value = '';
         $('cover-preview').innerHTML =
           '<img src="' + coverDataURL + '" alt="封面预览">' +
           '<div class="cover-tip">已选择本地封面，保存文章时自动上传</div>';
-      };
-      reader.readAsDataURL(file);
+      }).catch(function () {
+        toast('图片读取失败，请换一张试试', true);
+      });
       this.value = '';
     });
   }
@@ -950,9 +961,10 @@
   var pagesLoaded = false;
   var pagesData = null;
   var pagesWork = null;
-  /* v3：当前正在编辑的页下标（-1 = 停留在列表视图）；壁纸选项来自 data/wallpapers.json */
+  /* v4：editIndex 为正在编辑的页下标（-1 = 列表视图）；
+     bgVariantMap 缓存各背景应用的变体清单（如壁纸/视频），供屏背景下拉使用 */
   var editIndex = -1;
-  var wallpaperOptions = [];
+  var bgVariantMap = {};
   /* v3.1 响应式模板库（data/pages.json 顶层 responsive）：respWork 为工作副本随页面一起保存；
      respEdit = null | {mode:'new'|'edit', idx} 表示模板编辑器展开中 */
   var respWork = null;
@@ -974,7 +986,7 @@
 
   /* 行首图标格初始 HTML（数据 tab 用）：
      已有 __icon（本浏览器匹配/上传后）→ 直接显示 dataURL；
-     否则按 hostname 乐观显示仓库图标（../assets/icons/sites/，
+     否则按 hostname 乐观显示仓库图标（../assets/icons/sites/<host>.webp，
      加载失败由捕获阶段 error 委托换成首字母）；连 host 都没有显示「？」 */
   function riBoxHTML(item) {
     item = item || {};
@@ -986,7 +998,7 @@
     var host = itemHost(item);
     if (host) {
       return '<span class="ri-box" data-state="repo">' +
-        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + host + '.png" alt="">' +
+        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + host + '.webp" alt="">' +
         '<span class="ri-letter" style="display:none">' + letter + '</span>' +
       '</span>';
     }
@@ -1000,7 +1012,7 @@
       '<input class="r-name" placeholder="名称，如：百度" value="' + escapeHTML(e.name) + '">' +
       '<input class="r-url" placeholder="搜索 URL 前缀，如 https://www.baidu.com/s?wd=" value="' + escapeHTML(e.url) + '">' +
       '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
-      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
+      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 32×32 WebP">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
   }
@@ -1025,7 +1037,7 @@
       '<input class="r-name" placeholder="网站名称" value="' + escapeHTML(l.name) + '">' +
       '<input class="r-url" placeholder="网址，如 https://www.baidu.com/" value="' + escapeHTML(l.url) + '">' +
       '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
-      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
+      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 32×32 WebP">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
   }
@@ -1081,35 +1093,10 @@
     '</section>' +
 
     '<section class="site-section">' +
-      '<h2>首页动态背景</h2>' +
-      '<label class="form-field"><span>背景类型</span>' +
-        '<select id="st-bg-type">' +
-          '<option value="particles">粒子动画</option>' +
-          '<option value="image">静态图片</option>' +
-          '<option value="video">循环视频</option>' +
-          '<option value="none">关闭背景</option>' +
-        '</select></label>' +
-      '<div id="st-bg-particles">' +
-        '<div class="form-grid form-grid-4">' +
-          '<label class="form-field"><span>粒子数量</span>' +
-            '<input type="number" id="st-bg-count" min="1" max="40" step="1"></label>' +
-          '<label class="form-field"><span>速度倍率</span>' +
-            '<input type="number" id="st-bg-speed" min="0" max="3" step="0.1"></label>' +
-          '<label class="form-field"><span>最小半径 px</span>' +
-            '<input type="number" id="st-bg-sizemin" min="5" max="400" step="1"></label>' +
-          '<label class="form-field"><span>最大半径 px</span>' +
-            '<input type="number" id="st-bg-sizemax" min="5" max="500" step="1"></label>' +
-        '</div>' +
-        '<label class="form-field"><span>粒子配色</span>' +
-          '<select id="st-bg-colormode">' +
-            '<option value="auto">自动（跟随主题色 + 补充色）</option>' +
-            '<option value="custom">自定义颜色池</option>' +
-          '</select></label>' +
-        '<label class="form-field hidden" id="st-bg-colors-wrap"><span>颜色列表（每行一个十六进制颜色）</span>' +
-          '<textarea id="st-bg-colors" rows="3" placeholder="#f9cc46&#10;#ef6a5f&#10;#7cc98e"></textarea></label>' +
-      '</div>' +
-      '<label class="form-field hidden" id="st-bg-src-wrap"><span>图片 / 视频资源地址（仅图片/视频模式使用）</span>' +
-        '<input type="text" id="st-bg-src" placeholder="assets/images/bg.jpg" autocomplete="off"></label>' +
+      '<h2>背景设置</h2>' +
+      '<p class="section-hint">粒子动画、图片壁纸、循环视频都已改为「背景类应用」：' +
+      '到「应用管理」编辑——粒子参数在 particles 的「参数」页；壁纸在 wallpapers 的「数据」页上传；' +
+      '视频在 videos 的「数据」页登记。各屏使用哪种背景，在「页面管理」对应屏的「背景类型」中选择。</p>' +
     '</section>' +
 
     '<section class="site-section">' +
@@ -1120,13 +1107,6 @@
     '</section>' +
 
     '<p class="section-hint" style="margin-top:14px">首页应用（公告 / 名言 / 搜索引擎 / 网址导航）的数据与配置已移至「应用管理」；页面结构与模块挂载在「页面管理」中维护。</p>';
-  }
-
-  /* 背景类型切换：粒子参数 / 媒体地址互斥显示 */
-  function syncBgFieldVisibility() {
-    var type = $('st-bg-type').value;
-    $('st-bg-particles').classList.toggle('hidden', type !== 'particles');
-    $('st-bg-src-wrap').classList.toggle('hidden', type !== 'image' && type !== 'video');
   }
 
   /* ---------- 加载并填充 ---------- */
@@ -1149,7 +1129,6 @@
 
   function fillSiteForm(data) {
     var c = data.config || {};
-    var bg = c.background || {};
 
     $('site-card').innerHTML = siteFormHTML();
 
@@ -1164,18 +1143,6 @@
     /* 颜色选择器只接受合法 #rrggbb，非法时给个默认色但保留文本框原值 */
     $('st-primary-color').value = /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : '#1d6ff2';
     $('st-dark').value = (c.theme && /^(auto|light|dark)$/.test(c.theme.dark)) ? c.theme.dark : 'auto';
-
-    $('st-bg-type').value = ['particles', 'image', 'video', 'none'].indexOf(bg.type) > -1 ? bg.type : 'particles';
-    $('st-bg-count').value = bg.count != null ? bg.count : 6;
-    $('st-bg-speed').value = bg.speed != null ? bg.speed : 0.4;
-    var size = Array.isArray(bg.size) ? bg.size : [25, 115];
-    $('st-bg-sizemin').value = size[0] != null ? size[0] : 25;
-    $('st-bg-sizemax').value = size[1] != null ? size[1] : 115;
-    var colorIsAuto = !Array.isArray(bg.color);   /* 'auto' 或缺省都视为自动 */
-    $('st-bg-colormode').value = colorIsAuto ? 'auto' : 'custom';
-    $('st-bg-colors').value = colorIsAuto ? '' : bg.color.join('\n');
-    $('st-bg-src').value = bg.src || '';
-    syncBgFieldVisibility();
 
     $('st-social').innerHTML = (c.social || []).map(socialRowHTML).join('') || socialRowHTML();
   }
@@ -1206,14 +1173,6 @@
 
       if (e.target.closest('#st-social-add')) {
         $('st-social').insertAdjacentHTML('beforeend', socialRowHTML());
-      }
-    });
-
-    /* 背景类型 / 配色方式切换 */
-    document.addEventListener('change', function (e) {
-      if (e.target.id === 'st-bg-type') syncBgFieldVisibility();
-      if (e.target.id === 'st-bg-colormode') {
-        $('st-bg-colors-wrap').classList.toggle('hidden', e.target.value !== 'custom');
       }
     });
 
@@ -1271,41 +1230,8 @@
     if (!/^#[0-9a-fA-F]{6}$/.test(primary)) return { error: '主题色必须是 #rrggbb 形式的十六进制颜色' };
     c.theme = { primary: primary, dark: $('st-dark').value };
 
-    /* 背景：先继承旧对象（cover/position 等表单未覆盖的字段原样保留） */
-    var bg = Object.assign({}, c.background || {});
-    bg.type = $('st-bg-type').value;
-    if (bg.type === 'particles') {
-      var n;
-      n = numClamp('st-bg-count', 1, 40, 6, '粒子数量'); if (n.error) return { error: n.error }; bg.count = n.value;
-      n = numClamp('st-bg-speed', 0, 3, 0.4, '速度倍率'); if (n.error) return { error: n.error }; bg.speed = n.value;
-      n = numClamp('st-bg-sizemin', 5, 400, 25, '最小半径'); if (n.error) return { error: n.error };
-      var sizeMin = n.value;
-      n = numClamp('st-bg-sizemax', 5, 500, 115, '最大半径'); if (n.error) return { error: n.error };
-      var sizeMax = n.value;
-      if (sizeMin > sizeMax) return { error: '粒子最小半径不能大于最大半径' };
-      bg.size = [sizeMin, sizeMax];
-
-      if ($('st-bg-colormode').value === 'custom') {
-        var colors = $('st-bg-colors').value.split('\n')
-          .map(function (s) { return s.trim(); })
-          .filter(Boolean);
-        if (!colors.length) return { error: '自定义粒子配色至少填一个颜色' };
-        if (colors.some(function (x) { return !/^#[0-9a-fA-F]{6}$/.test(x); })) {
-          return { error: '粒子配色每行必须是 #rrggbb 形式的颜色' };
-        }
-        bg.color = colors;
-      } else {
-        bg.color = 'auto';
-      }
-    }
-    if (bg.type === 'image' || bg.type === 'video') {
-      bg.src = $('st-bg-src').value.trim();
-      if (!bg.src) return { error: bg.type === 'image' ? '图片背景需要填写资源地址' : '视频背景需要填写资源地址' };
-    }
-    c.background = bg;
-
-    /* 站点设置瘦身后：heroNotice/quoteSpeed/navPanel 归「应用管理」管辖，
-       这里基于快照深拷贝只覆盖表单管辖字段，其余原样保留 */
+    /* 站点设置瘦身后：背景（粒子/壁纸/视频）归「背景类应用」管辖，
+       heroNotice/quoteSpeed/navPanel 等归对应应用；这里只覆盖表单管辖字段，其余原样保留 */
     var social = collectPairs($('st-social'), '社交链接');
     if (social.bad) return { error: social.bad };
     c.social = social.rows;
@@ -1815,8 +1741,7 @@
   var ALIGN_PAIRS = [['left', '左对齐'], ['center', '居中'], ['right', '右对齐']];
   var VALIGN_PAIRS = [['start', '靠上'], ['center', '上下居中'], ['end', '靠下']];
   var HALIGN_PAIRS = [['left', '左对齐'], ['center', '居中'], ['right', '右对齐']];
-  /* 屏背景开关开启后的类型（关闭=none，不在此列，由复选框表达） */
-  var BG_TYPE_PAIRS = [['particles', '粒子动画'], ['wallpaper', '图片壁纸']];
+  /* v4：屏背景类型改为后台背景应用清单动态生成，不再有写死的类型对 */
   var ORDER_PAIRS = [['newest', '最新在前'], ['oldest', '最早在前']];
   var GROUP_PAIRS = [['year', '按年 → 月'], ['month', '按年-月'], ['flat', '平铺不分组']];
 
@@ -1922,8 +1847,10 @@
 
   function appAddHTML(si, bi) {
     var opts = '<option value="">＋ 添加板块…</option>';
-    /* 下拉直接来自应用注册表（清单 + define 探测），自定义应用自动出现 */
+    /* 下拉直接来自应用注册表（清单 + define 探测），自定义应用自动出现；
+       kind=background 的背景应用只能作为屏背景，不能挂进盒子 */
     Object.keys(adminRegistry).forEach(function (id) {
+      if (adminRegistry[id].kind === 'background') return;
       opts += '<option value="' + id + '">' + appLabel(id) + '（' + id + '）</option>';
     });
     return '<select class="pe-app-add" data-si="' + si + '" data-bi="' + bi + '">' + opts + '</select>';
@@ -1964,22 +1891,6 @@
     '</div>';
   }
 
-  function wallpaperOptionsHTML(selected) {
-    var opts = '<option value="">— 请选择壁纸 —</option>';
-    var hit = false;
-    wallpaperOptions.forEach(function (w) {
-      var on = w.file === selected;
-      if (on) hit = true;
-      opts += '<option value="' + escapeHTML(w.file) + '"' + (on ? ' selected' : '') + '>' +
-        escapeHTML(w.name) + '（' + (w.tone === 'dark' ? '暗' : '亮') + '）</option>';
-    });
-    /* 当前配置指向一张已被移出 data/wallpapers.json 的图时保留原值，避免静默丢失 */
-    if (selected && !hit) {
-      opts += '<option value="' + escapeHTML(selected) + '" selected>' + escapeHTML(selected) + '</option>';
-    }
-    return opts;
-  }
-
   /* 屏级布局九宫格：3×3 按钮一格同时定 vAlign（纵）与 hAlign（横） */
   function grid9HTML(v, h) {
     var html = '<div class="pe-grid9">';
@@ -1996,11 +1907,23 @@
 
   function screenEditorHTML(p, sc, si) {
     var multi = p.screens.length > 1;
-    /* 旧值 default/缺失归一为关闭(none)；开关只认 particles/wallpaper 为开启 */
-    var rawBg = (sc.bg && sc.bg.type) === 'particles' || (sc.bg && sc.bg.type) === 'wallpaper'
-      ? sc.bg.type : 'particles';
-    var bgOn = (sc.bg && (sc.bg.type === 'particles' || sc.bg.type === 'wallpaper'));
-    var bgFile = (sc.bg && sc.bg.file) || '';
+    /* v4 屏背景为「背景应用」：{app, variant?}；开关只认 app 非空 */
+    var bgApp = (sc.bg && sc.bg.app) || '';
+    var bgOn = !!bgApp;
+    var bgVariant = (sc.bg && sc.bg.variant) || '';
+    var bgDef = bgApp ? adminRegistry[bgApp] : null;
+    var hasVariants = !!(bgDef && bgDef.variants);
+    /* 未开启时默认选中清单第一个应用，开启即可直接保存 */
+    var selApp = bgApp || ((adminBackgroundApps()[0] || {}).id || '');
+    var bgTypeOpts = adminBackgroundApps().map(function (d) {
+      return '<option value="' + d.id + '"' + (d.id === selApp ? ' selected' : '') + '>' +
+        escapeHTML(d.name) + '</option>';
+    }).join('');
+    /* 当前 app 指向已卸载应用时追加保留项，避免静默丢失 */
+    if (bgApp && !adminRegistry[bgApp]) {
+      bgTypeOpts += '<option value="' + escapeHTML(bgApp) + '" selected>' +
+        escapeHTML(bgApp) + '（未安装）</option>';
+    }
     return '<div class="card pe-card pe-screen" data-si="' + si + '">' +
       '<div class="pe-sc-head">' +
         '<b>第 ' + (si + 1) + ' 屏</b>' +
@@ -2022,10 +1945,10 @@
           '<span class="pe-bg-on"><input type="checkbox" class="pe-bgon"' + (bgOn ? ' checked' : '') + '>' +
           '<em>开启' + (bgOn ? '' : '（关闭后此屏无背景）') + '</em></span></label>' +
         '<label class="form-field pe-bg-ops' + (bgOn ? '' : ' hidden') + '"><span>背景类型</span>' +
-          '<select class="pe-bgtype">' + selOptions(BG_TYPE_PAIRS, rawBg) + '</select></label>' +
-        '<label class="form-field pe-bgfile-wrap' + (bgOn && rawBg === 'wallpaper' ? '' : ' hidden') + '">' +
-          '<span>壁纸图片（图库维护在 data/wallpapers.json）</span>' +
-          '<select class="pe-bgfile">' + wallpaperOptionsHTML(bgFile) + '</select></label>' +
+          '<select class="pe-bgtype">' + bgTypeOpts + '</select></label>' +
+        '<label class="form-field pe-bgvariant-wrap' + (bgOn && hasVariants ? '' : ' hidden') + '">' +
+          '<span>变体（壁纸 / 视频条目，在应用「数据」页维护）</span>' +
+          '<select class="pe-bgvariant">' + bgVariantOptionsHTML(bgApp || selApp, bgVariant) + '</select></label>' +
         '<div class="form-field"><span>布局方式（九宫格：盒组在屏内的位置）</span>' +
           grid9HTML(sc.vAlign || 'start', sc.hAlign || 'center') + '</div>' +
       '</div>' +
@@ -2108,18 +2031,18 @@
       var scEls = root.querySelectorAll('.pe-screen');
       for (var s = 0; s < scEls.length; s++) {
         var scEl = scEls[s];
-        /* 背景开关关闭=none；开启时取类型 select（粒子/壁纸） */
+        /* 背景开关关闭={type:'none'}；开启={app, variant?}（变体仅对有变体的应用收集） */
         var bgOn = scEl.querySelector('.pe-bgon').checked;
-        var bgType = bgOn ? scEl.querySelector('.pe-bgtype').value : 'none';
         /* 九宫格当前格：一格同时定垂直与水平 */
         var g9 = scEl.querySelector('.pe-grid9 .on');
-        var sc = { bg: { type: bgType },
+        var sc = { bg: bgOn ? { app: scEl.querySelector('.pe-bgtype').value } : { type: 'none' },
                    vAlign: g9 ? g9.dataset.v : 'start',
                    hAlign: g9 ? g9.dataset.h : 'center',
                    boxes: [] };
-        if (bgType === 'wallpaper') {
-          var bgFile = scEl.querySelector('.pe-bgfile').value;
-          if (bgFile) sc.bg.file = bgFile;
+        var vwrap = scEl.querySelector('.pe-bgvariant-wrap');
+        if (bgOn && !vwrap.classList.contains('hidden')) {
+          var bgVariantVal = scEl.querySelector('.pe-bgvariant').value;
+          if (bgVariantVal) sc.bg.variant = bgVariantVal;
         }
         sc.responsive = readRespAttach(scEl.querySelector('.pe-resp[data-level="screen"]'), '第 ' + (s + 1) + ' 屏');
 
@@ -2230,14 +2153,45 @@
     return null;
   }
 
-  /* ---------- 加载 ---------- */
+  /* ---------- 背景应用（后台不执行应用代码，避免前台 CSS/define 副作用污染后台；
+     清单与变体全部来自 probe 出的 adminRegistry） ---------- */
 
-  function loadWallpaperOptions() {
-    /* 壁纸清单供屏幕背景下拉使用；加载失败不影响页面编辑（仅少了可选项） */
-    return readDataFile('data/wallpapers.json').then(function (d) {
-      wallpaperOptions = (d && Array.isArray(d.wallpapers)) ? d.wallpapers : [];
-    }).catch(function () { wallpaperOptions = []; });
+  /* 背景应用清单，顺序与 applications.json 一致 */
+  function adminBackgroundApps() {
+    return adminManifest.apps
+      .map(function (m) { return adminRegistry[m.id]; })
+      .filter(function (d) { return d && d.kind === 'background'; });
   }
+
+  /* 预拉所有带变体的背景应用清单（壁纸/视频）；单个失败只置空，不阻塞页面编辑 */
+  function preloadBgVariants() {
+    return Promise.all(adminBackgroundApps().map(function (d) {
+      if (!d.variants) return Promise.resolve();
+      return d.variants()
+        .then(function (list) { bgVariantMap[d.id] = Array.isArray(list) ? list : []; })
+        .catch(function () { bgVariantMap[d.id] = []; });
+    }));
+  }
+
+  /* 变体下拉 HTML：空值 = 不指定（默认随机一张）；
+     指向已被移出数据文件的变体时追加一项保留原值，避免静默丢失 */
+  function bgVariantOptionsHTML(appId, selected) {
+    var opts = '<option value="">— 不指定（默认随机）—</option>';
+    var hit = false;
+    (bgVariantMap[appId] || []).forEach(function (v) {
+      var on = v.value === selected;
+      if (on) hit = true;
+      var toneTag = v.tone === 'dark' ? '暗' : v.tone === 'light' ? '亮' : '';
+      opts += '<option value="' + escapeHTML(v.value) + '"' + (on ? ' selected' : '') + '>' +
+        escapeHTML(v.label || v.value) + (toneTag ? '（' + toneTag + '）' : '') + '</option>';
+    });
+    if (selected && !hit) {
+      opts += '<option value="' + escapeHTML(selected) + '" selected>' + escapeHTML(selected) + '</option>';
+    }
+    return opts;
+  }
+
+  /* ---------- 加载 ---------- */
 
   function loadPagesData() {
     $('pages-list').innerHTML =
@@ -2247,7 +2201,7 @@
 
     /* 先确保应用注册表就绪：页面编辑器的板块名称/「添加板块」下拉都读它 */
     loadAdminApps()
-      .then(function () { return Promise.all([readDataFile('data/pages.json'), loadWallpaperOptions()]); })
+      .then(function () { return Promise.all([readDataFile('data/pages.json'), preloadBgVariants()]); })
       .then(function (r) {
       var data = normalizePagesFile(r[0]);
       /* pagesData 保留整份文件快照（含顶层 _comment），保存时深拷贝回写，
@@ -2598,35 +2552,30 @@
       rerenderEditor();
     });
 
-    /* 编辑视图 change：背景类型显隐壁纸下拉 / 添加板块 / 跨盒移动。
+    /* 编辑视图 change：背景开关/类型与变体行显隐 / 添加板块 / 跨盒移动。
        用 change 而非 click：select 展开时也会触发 click（旧版已踩过） */
     $('pe-body').addEventListener('change', function (e) {
       var el = e.target;
 
-      /* 背景总开关：关=只留开关，类型/壁纸选择全部隐藏；开=恢复类型行 + 按类型决定壁纸行 */
+      /* 背景总开关：关=只留开关；开=恢复类型行，变体行按应用能力显隐 */
       if (el.classList.contains('pe-bgon')) {
         var sc0 = el.closest('.pe-screen');
         var on = el.checked;
         sc0.querySelector('.pe-bg-ops').classList.toggle('hidden', !on);
-        var isWp = on && sc0.querySelector('.pe-bgtype').value === 'wallpaper';
-        var fwrap = sc0.querySelector('.pe-bgfile-wrap');
-        fwrap.classList.toggle('hidden', !isWp);
-        if (isWp) {
-          var fsel = fwrap.querySelector('.pe-bgfile');
-          if (!fsel.value && fsel.options.length > 1) fsel.selectedIndex = 1;
-        }
+        var def0 = adminRegistry[sc0.querySelector('.pe-bgtype').value];
+        sc0.querySelector('.pe-bgvariant-wrap')
+          .classList.toggle('hidden', !(on && def0 && def0.variants));
         el.nextElementSibling.textContent = on ? '开启' : '开启（关闭后此屏无背景）';
         return;
       }
 
+      /* 切换背景应用：变体行只对带 variants 的应用出现，并重建变体选项 */
       if (el.classList.contains('pe-bgtype')) {
-        var wrap = el.closest('.pe-screen').querySelector('.pe-bgfile-wrap');
-        wrap.classList.toggle('hidden', el.value !== 'wallpaper');
-        if (el.value === 'wallpaper') {
-          var sel = wrap.querySelector('.pe-bgfile');
-          /* 切到壁纸时若未选图，默认选第一张，避免保存出「壁纸类型但无文件」的空配置 */
-          if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1;
-        }
+        var screenEl = el.closest('.pe-screen');
+        var def = adminRegistry[el.value];
+        var vwrap = screenEl.querySelector('.pe-bgvariant-wrap');
+        vwrap.classList.toggle('hidden', !(def && def.variants));
+        vwrap.querySelector('.pe-bgvariant').innerHTML = bgVariantOptionsHTML(el.value, '');
         return;
       }
 
@@ -2782,7 +2731,11 @@
       ROOT: ROOT,
       config: config || {},
       escapeHTML: escapeHTML,
-      loadDataFile: function () { return Promise.resolve(null); }
+      /* variants（壁纸/视频库）需要真实数据，走后台同一读取链：
+         LS 覆盖 → GitHub 远端 → 本地静态兜底，失败按空数据处理 */
+      loadDataFile: function (filename) {
+        return readDataFile(filename).catch(function () { return null; });
+      }
     };
     return new Proxy(base, {
       get: function (t, k) {
@@ -2842,7 +2795,9 @@
                 name: String(def.name || meta.id),
                 desc: String(def.desc || ''),
                 hero: def.hero === true,
+                kind: def.kind === 'background' ? 'background' : 'app',
                 configSchema: Array.isArray(def.configSchema) ? def.configSchema : [],
+                variants: typeof def.variants === 'function' ? def.variants : null,
                 builtin: meta.builtin === true,
                 dataFile: meta.dataFile || '',
                 code: code,
@@ -2931,6 +2886,7 @@
       ? '<span class="app-badge app-badge-builtin">内置</span>'
       : '<span class="app-badge app-badge-custom">自定义</span>';
     if (d.hero) badges += '<span class="app-badge app-badge-hero">首屏</span>';
+    if (d.kind === 'background') badges += '<span class="app-badge app-badge-bg">背景</span>';
     if (d.loadError) badges += '<span class="app-badge app-badge-error">代码异常</span>';
     var extra = '';
     if (d.dataFile) {
@@ -3006,6 +2962,9 @@
     if (base === 'search-engines.json') return 'engines';
     if (base === 'nav-links.json') return 'nav';
     if (base === 'quotes.json') return 'quotes';
+    if (base === 'wallpapers.json') return 'wallpapers';
+    if (base === 'bg-videos.json') return 'videos';
+    if (base === 'bg-colors.json') return 'colors';
     return dataFile ? 'json' : '';
   }
 
@@ -3014,10 +2973,10 @@
      前台（nav / search）不再运行时直连外站 favicon（慢且不可控），
      改在后台保存时为缺图标的条目匹配：
        主源 icon.horse（256px），备源 yandex（16px），
-       拿到后统一用 canvas 压成 64×64 PNG，暂存条目 __icon（data:URL）。
+       拿到后统一用 canvas 压成 32×32 WebP，暂存条目 __icon（data:URL）。
      两源对无图标/不存在域名都返回固定占位图，用 SHA-256 识别后放弃，
      该条目前台固定显示首字母徽章；以后每次保存都会自动重试。
-     提交时（buildIconDataCommit）__icon 转 assets/icons/sites/<host>.png
+     提交时（buildIconDataCommit）__icon 转 assets/icons/sites/<host>.webp
      独立文件上传并从 JSON 剥离，仓库里不留临时字段。
      ============================================================ */
   var ICON_FALLBACK_HASH = {
@@ -3054,7 +3013,11 @@
     });
   }
 
-  /* 图片字节 → 64×64 PNG data URL：
+  /* 图片字节 → 32×32 WebP data URL：
+     取合规中间档（16/32/64）：16 太虚，64 用不上——前台导航图标 16px、
+     后台行内图标 30px（高倍屏翻倍也仅 32/60，32 源在两档场景清晰度足够），
+     图标数量会持续增长，32 能把仓库体积控制在低位。
+     用 WebP 而非 PNG：同视觉质量体积小约一半，且支持透明底。
      经 blob:URL 本地解码，字节已由本页持有，canvas 不会被跨域污染 */
   function bytesToIconDataURL(buf) {
     return new Promise(function (resolve, reject) {
@@ -3062,13 +3025,13 @@
       var im = new Image();
       im.onload = function () {
         var c = document.createElement('canvas');
-        c.width = 64; c.height = 64;
+        c.width = 32; c.height = 32;
         var g = c.getContext('2d');
         g.imageSmoothingEnabled = true;
         g.imageSmoothingQuality = 'high';
-        g.drawImage(im, 0, 0, 64, 64);
+        g.drawImage(im, 0, 0, 32, 32);
         URL.revokeObjectURL(url);
-        try { resolve(c.toDataURL('image/png')); } catch (e) { reject(e); }
+        try { resolve(c.toDataURL('image/webp', 0.9)); } catch (e) { reject(e); }
       };
       im.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode fail')); };
       im.src = url;
@@ -3157,42 +3120,44 @@
     } catch (e) { return ''; }
   }
 
-  /* 仓库已有图标的域名集合（一次 Trees API，模块内缓存）：
-     避免每次保存都给老条目重发请求（icon.horse 免费 1000 次/月）。
-     加载失败 → null，调用方退化为「只匹配本次新增条目」，绝不盲抓 */
-  var repoIconHosts = 'init';   /* 'init'=未加载；null=加载失败；{}=结果集 */
-  function loadRepoIconHosts() {
-    if (repoIconHosts !== 'init') return Promise.resolve(repoIconHosts);
-    var rp = repoParts();
-    if (!(rp.owner && rp.name) || config.repo === 'your-name/your-repo') {
-      repoIconHosts = null;
-      return Promise.resolve(null);
-    }
-    return gh('/repos/' + rp.owner + '/' + rp.name +
-              '/git/trees/' + encodeURIComponent(config.branch) + '?recursive=1')
-      .then(function (data) {
-        var set = {};
-        (data.tree || []).forEach(function (n) {
-          var m = /^assets\/icons\/sites\/(.+)\.png$/.exec(n.path);
-          if (m) set[m[1]] = 1;
-        });
-        repoIconHosts = set;
-        return set;
+  /* 域名图标是否已在仓库（assets/icons/sites/<host>.webp）：
+     相对路径直接探测本地文件即可——本地服务器/线上 dist 都直接服务该目录，
+     结果按 host 缓存（一会话内同批条目只探一次）。
+     三态：true=存在 / false=不存在 / null=探测失败（调用方退化为只抓新增，绝不盲抓） */
+  var iconExistsCache = {};
+  function iconExistsInRepo(host) {
+    if (host in iconExistsCache) return Promise.resolve(iconExistsCache[host]);
+    return fetch(ROOT + 'assets/icons/sites/' + host + '.webp', { cache: 'no-cache' })
+      .then(function (res) {
+        /* 只认真实图片：404 或兜底 HTML 一律视为不存在 */
+        var ok = res.ok && /^image\//.test(res.headers.get('Content-Type') || '');
+        iconExistsCache[host] = ok;
+        return ok;
       })
-      .catch(function () { repoIconHosts = null; return null; });
+      .catch(function () { return null; });   /* 失败不缓存，下次可重试 */
   }
 
-  /* 保存前自动匹配：仓库已有的跳过；仓库信息拿不到时只抓本次新增条目。
+  /* 保存前自动匹配：本地已有图标的跳过；探测失败时只抓本次新增条目。
      匹配到的 dataURL 写入 item.__icon；并发 3 路，避免一次性打满连接数 */
   function autoMatchIcons(dataOut, kind, btn) {
     var items = iconDataItems(dataOut, kind);
-    return loadRepoIconHosts().then(function (hostSet) {
-      /* 保存前的旧条目（按编辑器打开时的数据文件），仓库信息失败时用作兜底判定 */
-      var file = (adminRegistry[appEdit.id] || {}).dataFile;
-      var oldURLs = {};
-      iconDataItems(appsData.data[file] || [], kind)
-        .forEach(function (it) { oldURLs[it.url] = 1; });
+    /* 保存前的旧条目（按编辑器打开时的数据文件），探测失败时用作兜底判定 */
+    var file = (adminRegistry[appEdit.id] || {}).dataFile;
+    var oldURLs = {};
+    iconDataItems(appsData.data[file] || [], kind)
+      .forEach(function (it) { oldURLs[it.url] = 1; });
 
+    /* 先按 host 去重，逐个探测本地图标存在性 */
+    var hosts = {};
+    items.forEach(function (it) {
+      if (it.__icon) return;
+      var host = itemHost(it);
+      if (host) hosts[host] = 1;
+    });
+    var existMap = {};
+    return Promise.all(Object.keys(hosts).map(function (host) {
+      return iconExistsInRepo(host).then(function (r) { existMap[host] = r; });
+    })).then(function () {
       var todo = [];
       var seen = {};
       items.forEach(function (it) {
@@ -3200,7 +3165,8 @@
         var host = itemHost(it);
         if (!host || seen[host]) return;
         seen[host] = 1;
-        if (hostSet ? hostSet[host] : oldURLs[it.url]) return; /* 有图标：跳过；无仓库信息：老条目不重抓 */
+        if (existMap[host] === true) return;                     /* 有图标：跳过 */
+        if (existMap[host] === null && oldURLs[it.url]) return;  /* 探测失败：老条目不重抓 */
         todo.push({ host: host, item: it });
       });
       if (!todo.length) return;
@@ -3222,7 +3188,7 @@
     });
   }
 
-  /* 提交组装：engines/nav 数据里的临时 __icon（data:URL）转独立 PNG 文件，
+  /* 提交组装：engines/nav 数据里的临时 __icon（data:URL）转独立 WebP 文件，
      JSON 剥离全部 __icon——仓库只保留干净数据，前台按 hostname 找本地图标。
      删除登记（op=del）无需内容：文件删除由勾选行统一处理，返回空文件组 */
   function buildIconDataCommit(path, op, text) {
@@ -3236,14 +3202,17 @@
     var seenIcon = {};
     iconDataItems(data, kind).forEach(function (it) {
       if (typeof it.__icon === 'string' &&
-          it.__icon.indexOf('data:image/png;base64,') === 0) {
+          it.__icon.indexOf('data:image/') === 0) {
+        /* 扩展名以 dataURL 实际类型为准：新图标是 webp，
+           兼容本次改动前已暂存在 localStorage 的 png dataURL */
+        var parsed = parseDataURL(it.__icon);
         var host = itemHost(it);
         /* 同域名只上传一次（多分类出现同一站时） */
-        if (host && !seenIcon[host]) {
+        if (parsed && host && !seenIcon[host]) {
           seenIcon[host] = 1;
           extraFiles.push({
-            path: 'assets/icons/sites/' + host + '.png',
-            content: it.__icon.slice('data:image/png;base64,'.length),
+            path: 'assets/icons/sites/' + host + '.' + parsed.ext,
+            content: parsed.b64,
             encoding: 'base64'
           });
         }
@@ -3261,12 +3230,39 @@
     };
   }
 
+  /* data/wallpapers.json 提交：行内 __upload dataURL 转 assets/wallpapers/ 下的
+     独立文件（base64；上传时已压成 WebP ≤2K，GIF/SVG 直通），
+     再从 JSON 剥离——同图标的临时字段处理约定 */
+  function buildWallpaperDataCommit(path, op, text) {
+    if (op === 'del' || text == null) return { kind: 'file', path: path, files: [] };
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { return { kind: 'file', path: path, files: [{ path: path, content: text }] }; }
+
+    var extraFiles = [];
+    (data.wallpapers || []).forEach(function (w) {
+      if (typeof w.__upload === 'string' && w.__upload.indexOf('data:image/') === 0) {
+        var parsed = parseDataURL(w.__upload);
+        if (parsed && w.file) {
+          extraFiles.push({ path: w.file, content: parsed.b64, encoding: 'base64' });
+        }
+      }
+      delete w.__upload;
+    });
+
+    return {
+      kind: 'file',
+      path: path,
+      files: [{ path: path, content: JSON.stringify(data, null, 2) + '\n' }].concat(extraFiles)
+    };
+  }
+
   /* ============================================================
      数据编辑器行内图标（2026-09-25）
      编辑过程中就能看到每行图标：网址输入停顿 0.8s 自动匹配；
-     匹配失败显示首字母、可点「上传」自选图片（压 64×64 PNG）。
+     匹配失败显示首字母、可点「上传」自选图片（压 32×32 WebP）。
      匹配状态按行 DOM 存在 liveIconMap（WeakMap），收集时带进数据，
-     保存后由基线 __icon 接管，提交时全部转独立 PNG 并剥离。
+     保存后由基线 __icon 接管，提交时全部转独立 WebP 并剥离。
        st = {dataURL, host, manual}
        manual=true 用户手动上传：改网址也不自动覆盖
      ============================================================ */
@@ -3284,7 +3280,7 @@
       box.innerHTML = '<img class="ri-img" src="' + escapeHTML(view.dataURL) + '" alt="">';
     } else if (view.state === 'repo') {
       box.innerHTML =
-        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + view.host + '.png" alt="">' +
+        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + view.host + '.webp" alt="">' +
         '<span class="ri-letter" style="display:none"></span>';
     } else if (view.state === 'letter') {
       box.innerHTML = '<span class="ri-letter">' + escapeHTML(view.text || '?') + '</span>';
@@ -3323,8 +3319,8 @@
           renderRiBox(row, { state: 'icon', dataURL: prev.dataURL });
           restore();
         } else {
-          loadRepoIconHosts().then(function (hostSet) {
-            if (hostSet && hostSet[host]) {
+          iconExistsInRepo(host).then(function (exists) {
+            if (exists) {
               renderRiBox(row, { state: 'repo', host: host });
             } else {
               liveIconMap.delete(row);
@@ -3346,8 +3342,8 @@
       return;
     }
     /* 仓库已有该 host 图标 → 直接显示本地路径，不发外站请求 */
-    loadRepoIconHosts().then(function (hostSet) {
-      if (hostSet && hostSet[host]) {
+    iconExistsInRepo(host).then(function (exists) {
+      if (exists) {
         liveIconMap.delete(row);
         renderRiBox(row, { state: 'repo', host: host });
         return;
@@ -3365,7 +3361,7 @@
     });
   }
 
-  /* 手动上传处理（文件读取 + 64×64 压缩 + 行内预览） */
+  /* 手动上传处理（文件读取 + 32×32 压缩 + 行内预览） */
   function handleIconFile(file) {
     var row = iconUploadRow;
     iconUploadRow = null;
@@ -3541,6 +3537,142 @@
     $('ae-params').innerHTML = warning + body;
   }
 
+  /* ---------- 壁纸 / 视频数据行 ---------- */
+
+  /* 当前等待接收上传图片的壁纸行（点「上传壁纸」时记下，文件选择回调里用） */
+  var wallpaperUploadRow = null;
+
+  /* 壁纸行：缩略图 + 名称/明暗/路径 + 上传原图。
+     __upload 是上传原图的临时 dataURL（提交时转 assets/wallpapers/ 独立图片并剥离，同图标机制）；
+     不用图标那套 32px 压缩——壁纸是全屏图，必须原图存储 */
+  function wallpaperRowHTML(w) {
+    w = w || {};
+    var thumbSrc = w.__upload || (w.file ? '../' + w.file : '');
+    return '<div class="media-row">' +
+      '<div class="media-thumb">' +
+        (thumbSrc ? '<img class="m-thumb-img" src="' + escapeHTML(thumbSrc) + '" alt="">'
+                  : '<span class="media-empty">无图</span>') +
+      '</div>' +
+      '<div class="media-fields">' +
+        '<label class="form-field"><span>名称</span>' +
+          '<input class="m-name" value="' + escapeHTML(w.name || '') + '" placeholder="便于识别的名称"></label>' +
+        '<label class="form-field"><span>明暗基调</span>' +
+          '<select class="m-tone">' +
+            '<option value=""' + (!w.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
+            '<option value="light"' + (w.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
+            '<option value="dark"' + (w.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
+          '</select></label>' +
+        '<label class="form-field"><span>文件路径</span>' +
+          '<input class="m-file" value="' + escapeHTML(w.file || '') + '" placeholder="assets/wallpapers/xxx.jpg"></label>' +
+      '</div>' +
+      '<div class="media-acts">' +
+        '<button type="button" class="btn m-upload">上传壁纸</button>' +
+        '<button type="button" class="btn btn-danger m-del" title="移除登记（不会删除图片文件）">×</button>' +
+      '</div>' +
+      (w.__upload ? '<input type="hidden" class="m-upload-data" value="' + escapeHTML(w.__upload) + '">' : '') +
+    '</div>';
+  }
+
+  /* 视频行：视频不经浏览器上传（文件大），只登记已放入仓库的路径 */
+  function videoRowHTML(v) {
+    v = v || {};
+    return '<div class="media-row">' +
+      '<div class="media-thumb media-thumb-video"><span class="media-empty">视频</span></div>' +
+      '<div class="media-fields">' +
+        '<label class="form-field"><span>名称</span>' +
+          '<input class="m-name" value="' + escapeHTML(v.name || '') + '" placeholder="便于识别的名称"></label>' +
+        '<label class="form-field"><span>明暗基调</span>' +
+          '<select class="m-tone">' +
+            '<option value=""' + (!v.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
+            '<option value="light"' + (v.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
+            '<option value="dark"' + (v.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
+          '</select></label>' +
+        '<label class="form-field"><span>文件路径（请先自行放入 assets/videos/）</span>' +
+          '<input class="m-file" value="' + escapeHTML(v.file || '') + '" placeholder="assets/videos/xxx.mp4"></label>' +
+      '</div>' +
+      '<div class="media-acts">' +
+        '<button type="button" class="btn btn-danger m-del" title="移除登记（不会删除视频文件）">×</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* 颜色壁纸行：色块实时预览 + 名称/颜色值/明暗 + 删除。
+     value 支持纯色与 CSS 渐变（内联进 style，escapeHTML 会转义引号）；
+     特殊值 none = 无背景（前台选它即清空屏背景） */
+  function colorRowHTML(c) {
+    c = c || {};
+    var hasBg = c.value && c.value !== 'none';
+    return '<div class="media-row">' +
+      '<div class="media-thumb media-thumb-color">' +
+        '<span class="color-swatch' + (hasBg ? '"'  : ' color-swatch-none"') +
+          (hasBg ? ' style="background:' + escapeHTML(c.value) + '"' : '') + '></span>' +
+      '</div>' +
+      '<div class="media-fields">' +
+        '<label class="form-field"><span>名称</span>' +
+          '<input class="c-name" value="' + escapeHTML(c.name || '') + '" placeholder="便于识别的名称"></label>' +
+        '<label class="form-field"><span>颜色值 / 渐变（none = 无背景）</span>' +
+          '<input class="c-value" value="' + escapeHTML(c.value || '') + '" placeholder="#ffffff 或 linear-gradient(135deg,#74ebd5,#9face6)"></label>' +
+        '<label class="form-field"><span>明暗基调</span>' +
+          '<select class="c-tone">' +
+            '<option value=""' + (!c.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
+            '<option value="light"' + (c.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
+            '<option value="dark"' + (c.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
+          '</select></label>' +
+      '</div>' +
+      '<div class="media-acts">' +
+        '<button type="button" class="btn btn-danger m-del" title="移除该颜色">×</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* 接收选中的壁纸图片：压成 WebP（长边≤2560，GIF/SVG 直通），
+     生成 assets/wallpapers/ 下的目标路径并回填行内 */
+  function handleWallpaperFile(file) {
+    var row = wallpaperUploadRow;
+    wallpaperUploadRow = null;
+    if (!file || !row) return;
+    if (!/^image\//.test(file.type)) { toast('请选择图片文件', true); return; }
+
+    /* 文件名只留英文/数字/点/_-（中文与空格进 URL 麻烦）；清空则用随机名。
+       扩展名不看原文件——以转换后 dataURL 的实际类型为准（webp/gif/svg） */
+    var raw = String(file.name || '');
+    var dot = raw.lastIndexOf('.');
+    var stem = (dot > -1 ? raw.slice(0, dot) : raw)
+      .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!stem) stem = 'wp-' + rand6();
+
+    fileToWebpDataURL(file, 2560, 0.85).then(function (dataURL) {
+      var parsed = parseDataURL(dataURL);
+      var ext = '.' + (parsed ? parsed.ext : 'webp');
+      var path = 'assets/wallpapers/' + stem + ext;
+      /* 与已登记路径撞名（常见：同名文件换图）→ 加随机后缀，避免覆盖旧图 */
+      var taken = Array.prototype.map.call(
+        document.querySelectorAll('#ae-wallpapers .m-file'),
+        function (i) { return i.value.trim(); });
+      if (taken.indexOf(path) > -1) {
+        path = 'assets/wallpapers/' + stem + '-' + rand6() + ext;
+      }
+
+      row.querySelector('.m-file').value = path;
+      var hid = row.querySelector('.m-upload-data');
+      if (!hid) {
+        hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.className = 'm-upload-data';
+        row.appendChild(hid);
+      }
+      hid.value = dataURL;
+      var thumbImg = document.createElement('img');
+      thumbImg.className = 'm-thumb-img';
+      thumbImg.alt = '';
+      thumbImg.src = dataURL;
+      row.querySelector('.media-thumb').innerHTML = '';
+      row.querySelector('.media-thumb').appendChild(thumbImg);
+    }).catch(function () {
+      toast('图片读取失败，请换一张试试', true);
+    });
+  }
+
   function renderDataTab(file) {
     var d = adminRegistry[appEdit.id];
     var kind = appDataKind(file);
@@ -3573,6 +3705,28 @@
       html += '<p class="section-hint">每行一条，前台随机取一条展示。</p>' +
         '<textarea id="ae-quotes" rows="12" autocomplete="off">' +
         escapeHTML(q.join('\n')) + '</textarea>';
+    } else if (kind === 'wallpapers') {
+      var wf = appsData.data[file] || {};
+      var wlist = Array.isArray(wf.wallpapers) ? wf.wallpapers : [];
+      html += '<p class="section-hint">壁纸上传时自动压成 WebP（长边≤2560，GIF/SVG 原样保留），存入 assets/wallpapers/；' +
+        '点「上传壁纸」选择本地图片后路径自动填入。移除条目只清除登记，不会删除仓库里的图片。</p>' +
+        '<div id="ae-wallpapers">' + wlist.map(wallpaperRowHTML).join('') + '</div>' +
+        '<button type="button" class="btn" id="ae-wallpaper-add">＋ 添加壁纸</button>' +
+        '<input type="file" id="ae-wallpaper-file" style="display:none" accept="image/*">';
+    } else if (kind === 'videos') {
+      var vf = appsData.data[file] || {};
+      var vlist = Array.isArray(vf.videos) ? vf.videos : [];
+      html += '<p class="section-hint">视频文件较大，不经浏览器上传：请先自行放入 assets/videos/' +
+        '（建议 mp4，控制在 10MB 内），再在此登记路径。移除条目只清除登记。</p>' +
+        '<div id="ae-videos">' + vlist.map(videoRowHTML).join('') + '</div>' +
+        '<button type="button" class="btn" id="ae-video-add">＋ 添加视频</button>';
+    } else if (kind === 'colors') {
+      var cf = appsData.data[file] || {};
+      var clist = Array.isArray(cf.colors) ? cf.colors : [];
+      html += '<p class="section-hint">每行一个颜色：纯色填 #ffffff 这类色值，渐变填 linear-gradient(...) 等 CSS 背景写法；' +
+        '特殊值 none 表示无背景（建议保留在第一行，作为访客关闭背景的入口）。</p>' +
+        '<div id="ae-colors">' + clist.map(colorRowHTML).join('') + '</div>' +
+        '<button type="button" class="btn" id="ae-color-add">＋ 添加颜色</button>';
     } else if (kind === 'json') {
       var raw = appsData.data[file];
       html += '<p class="section-hint">该数据文件的 JSON 内容，应用代码内通过 ' +
@@ -3669,6 +3823,54 @@
       dataOut = $('ae-quotes').value.split('\n')
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
+    } else if (kind === 'wallpapers') {
+      var wps = [];
+      var wErr = null;
+      document.querySelectorAll('#ae-wallpapers .media-row').forEach(function (row) {
+        var file = (row.querySelector('.m-file') || {}).value || '';
+        file = file.trim();
+        if (!file) return;   /* 整行没路径视为空行忽略（名称/明暗随之丢弃） */
+        var up = row.querySelector('.m-upload-data');
+        if (up && up.value && up.value.indexOf('data:') !== 0) wErr = '壁纸上传数据损坏，请重新上传';
+        var wTone = (row.querySelector('.m-tone') || {}).value;
+        wps.push({
+          file: file,
+          name: (row.querySelector('.m-name') || {}).value || '',
+          tone: wTone === 'light' || wTone === 'dark' ? wTone : '',
+          __upload: up ? up.value : undefined
+        });
+      });
+      if (wErr) return { error: wErr };
+      /* 保留 _comment 等表外字段：基于快照浅拷贝，只覆盖 wallpapers 数组 */
+      dataOut = Object.assign({}, appsData.data[dataFile] || {}, { wallpapers: wps });
+    } else if (kind === 'videos') {
+      var vds = [];
+      document.querySelectorAll('#ae-videos .media-row').forEach(function (row) {
+        var file = ((row.querySelector('.m-file') || {}).value || '').trim();
+        if (!file) return;
+        var vTone = (row.querySelector('.m-tone') || {}).value;
+        vds.push({
+          file: file,
+          name: (row.querySelector('.m-name') || {}).value || '',
+          tone: vTone === 'light' || vTone === 'dark' ? vTone : ''
+        });
+      });
+      /* 保留 _comment 等表外字段：基于快照浅拷贝，只覆盖 videos 数组 */
+      dataOut = Object.assign({}, appsData.data[dataFile] || {}, { videos: vds });
+    } else if (kind === 'colors') {
+      var cls = [];
+      document.querySelectorAll('#ae-colors .media-row').forEach(function (row) {
+        var val = ((row.querySelector('.c-value') || {}).value || '').trim();
+        if (!val) return;   /* 没填颜色值的行视为空行忽略 */
+        var tone = (row.querySelector('.c-tone') || {}).value;
+        cls.push({
+          value: val,
+          name: ((row.querySelector('.c-name') || {}).value || '').trim(),
+          tone: tone === 'light' || tone === 'dark' ? tone : ''
+        });
+      });
+      /* 保留 _comment 等表外字段：基于快照浅拷贝，只覆盖 colors 数组 */
+      dataOut = Object.assign({}, appsData.data[dataFile] || {}, { colors: cls });
     } else if (kind === 'json') {
       var txt = $('ae-json-data').value.trim();
       if (!txt) return { error: '数据内容不能为空；不需要数据文件请清空上方文件名' };
@@ -3743,10 +3945,13 @@
       files.push({ path: MANIFEST_PATH, content: JSON.stringify(mf, null, 2) + '\n' });
     }
 
-    /* 3. data/pages.json：schema 参数合入顶层 apps[id]，保留表外键与 pages 数组 */
+    /* 3. data/pages.json：schema 参数合入顶层 apps[id]，保留表外键与 pages 数组。
+       无参应用（壁纸/公告等）patch 为空，不写空配置节点污染 pages.json */
     var pf = JSON.parse(JSON.stringify(appsData.pagesFile || {}));
     pf.apps = pf.apps || {};
-    pf.apps[id] = Object.assign({}, pf.apps[id] || {}, c.patch);
+    if (Object.keys(c.patch).length) {
+      pf.apps[id] = Object.assign({}, pf.apps[id] || {}, c.patch);
+    }
     if (JSON.stringify(pf) !== JSON.stringify(appsData.pagesFile || {})) {
       files.push({ path: 'data/pages.json', content: JSON.stringify(pf, null, 2) + '\n' });
     }
@@ -3773,7 +3978,9 @@
         name: String(c.def.name || id),
         desc: String(c.def.desc || ''),
         hero: c.def.hero === true,
+        kind: c.def.kind === 'background' ? 'background' : 'app',
         configSchema: Array.isArray(c.def.configSchema) ? c.def.configSchema : [],
+        variants: typeof c.def.variants === 'function' ? c.def.variants : null,
         builtin: meta.builtin === true,
         dataFile: c.dataFile,
         code: c.code,
@@ -4504,9 +4711,13 @@
           files: r2.files, extraDeletes: r2.deletes
         });
       }
-      /* engines/nav：临时 __icon 转独立 PNG 文件随提交上传，JSON 剥离 __icon */
+      /* engines/nav：临时 __icon 转独立 WebP 文件随提交上传，JSON 剥离 __icon */
       if (p === 'data/search-engines.json' || p === 'data/nav-links.json') {
         return Promise.resolve(buildIconDataCommit(p, ops[p], pendingLocalText(p)));
+      }
+      /* wallpapers：上传的 WebP dataURL 转 assets/wallpapers/ 文件，JSON 剥离 __upload */
+      if (p === 'data/wallpapers.json') {
+        return Promise.resolve(buildWallpaperDataCommit(p, ops[p], pendingLocalText(p)));
       }
       var content = pendingLocalText(p);
       if (/\.json$/.test(p)) {
@@ -4742,14 +4953,43 @@
         e.target.closest('.nav-group').querySelector('.nav-link-rows')
           .insertAdjacentHTML('beforeend', navLinkRowHTML());
       }
+
+      /* 壁纸 / 视频数据行 */
+      var mDel = e.target.closest('.m-del');
+      if (mDel) { mDel.closest('.media-row').remove(); return; }
+      var mUp = e.target.closest('.m-upload');
+      if (mUp) {
+        wallpaperUploadRow = mUp.closest('.media-row');
+        var wBox = $('ae-wallpaper-file');
+        if (wBox) wBox.click();
+        return;
+      }
+      if (e.target.closest('#ae-wallpaper-add')) {
+        $('ae-wallpapers').insertAdjacentHTML('beforeend', wallpaperRowHTML());
+        return;
+      }
+      if (e.target.closest('#ae-video-add')) {
+        $('ae-videos').insertAdjacentHTML('beforeend', videoRowHTML());
+        return;
+      }
+      if (e.target.closest('#ae-color-add')) {
+        $('ae-colors').insertAdjacentHTML('beforeend', colorRowHTML());
+      }
     });
 
-    /* 图标文件选中：交给 handleIconFile（压缩 64×64 + 行内预览） */
+    /* 文件类选择框：图标压缩走 ae-icon-file；壁纸原图走 ae-wallpaper-file */
     $('ae-data').addEventListener('change', function (e) {
-      if (e.target.id !== 'ae-icon-file') return;
-      var file = e.target.files && e.target.files[0];
-      e.target.value = '';   /* 选同一个文件也要能再次触发 change */
-      handleIconFile(file);
+      if (e.target.id === 'ae-icon-file') {
+        var file = e.target.files && e.target.files[0];
+        e.target.value = '';   /* 选同一个文件也要能再次触发 change */
+        handleIconFile(file);
+        return;
+      }
+      if (e.target.id === 'ae-wallpaper-file') {
+        var wpFile = e.target.files && e.target.files[0];
+        e.target.value = '';
+        handleWallpaperFile(wpFile);
+      }
     });
 
     /* 网址输入防抖实时匹配；名称输入时联动首字母徽章。
@@ -4770,9 +5010,14 @@
       }
     });
 
-    /* 仓库图标 img 加载失败（未提交/缺文件）→ 首字母。
-       error 不冒泡，用捕获阶段统一拦截 */
+    /* img 加载失败统一兜底（error 不冒泡，用捕获阶段）：
+       壁纸缩略图（仓库文件缺失）→ 占位；站点图标 → 首字母徽章 */
     $('ae-data').addEventListener('error', function (e) {
+      if (e.target.classList && e.target.classList.contains('m-thumb-img') &&
+          e.target.src.indexOf('data:') !== 0) {
+        e.target.closest('.media-thumb').innerHTML = '<span class="media-empty">未找到</span>';
+        return;
+      }
       if (!e.target.classList || !e.target.classList.contains('ri-img')) return;
       var box = e.target.closest('.ri-box');
       if (!box || box.dataset.state === 'icon') return; /* dataURL 失败不处理 */

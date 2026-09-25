@@ -10,6 +10,10 @@
     "名称与参数": "应用名称、描述、hero（首屏居中类）、可调参数（configSchema）、CSS、render 全部在应用文件的 SSBApps.define({...}) 里声明，本清单只管路由"
   },
   "apps": [
+    { "id": "particles",    "builtin": true },
+    { "id": "wallpapers",   "builtin": true, "dataFile": "data/wallpapers.json" },
+    { "id": "videos",       "builtin": true, "dataFile": "data/bg-videos.json" },
+    { "id": "colors",       "builtin": true, "dataFile": "data/bg-colors.json" },
     { "id": "notice",       "builtin": true },
     { "id": "quote",        "builtin": true, "dataFile": "data/quotes.json" },
     { "id": "search",       "builtin": true, "dataFile": "data/search-engines.json" },

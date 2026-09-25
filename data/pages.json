@@ -2,7 +2,7 @@
   "_comment": {
     "使用说明": "本文件是「页面 → 屏 → 盒子 → 板块」体系的核心配置（v3）。可直接修改此文件（本地模式下保存写入浏览器 localStorage，键为 ssb.local.app.pages）",
     "结构": "页面 pages[] → 多屏 screens[] → 多个盒子 boxes[] → 板块实例 apps[]。页面默认只有一屏；增加第二屏后非末屏底部自动出现下滑提示按钮，点按或滚轮翻到下一屏（滚轮翻屏为 screen-scroll.js 的自管状态机：短屏滑即翻页，长屏两段式夹取，不使用 CSS scroll-snap）",
-    "screen.bg": "屏级背景开关：type=none|particles|wallpaper。none=关闭，该屏不渲染背景层（纯净底色，访客右键菜单中也不出现背景切换组）；particles=粒子动画（参数取站点设置 background）；wallpaper=壁纸（file 留空为随机，图库见 data/wallpapers.json）",
+    "screen.bg": "屏级背景，v4 起改为「背景类应用」：{app, variant?}。app=背景应用 id（particles 粒子动画 / wallpapers 图片壁纸 / videos 循环视频，清单见 applications/applications.json 中 kind=background）；variant=变体值（如壁纸/视频的文件路径，留空则按屏稳定随机一张）；关闭背景写 {\"type\":\"none\"}。粒子参数在 particles 应用的参数中维护，壁纸图库见 data/wallpapers.json，视频清单见 data/bg-videos.json",
     "screen.vAlign": "布局方式为九宫格（内容在屏内的位置）：vAlign=垂直 start|center|end，hAlign=水平 start|center|end",
     "box": "width=盒子宽度，支持 px 与 %（如 880px、92%，窄屏自动夹取 100%-32px 防溢出）；hAlign=盒子在屏内水平对齐 auto|left|center|right（auto=跟随屏的九宫格）；padV/padH=盒子内边距上下/左右 px；gap=盒内板块的垂直间距 px",
     "app实例": "uid=实例唯一 id（同类型板块可重复添加，靠 uid 区分）；id=板块类型；enable=false 不渲染；align=板块在盒子内的水平对齐 left|center|right；marginV/marginH=板块外边距上下/左右 px；cfg=实例级配置（仅部分板块需要）",
@@ -45,7 +45,7 @@
       "file": "index.html",
       "screens": [
         {
-          "bg": { "type": "particles" },
+          "bg": { "app": "particles" },
           "vAlign": "center",
           "boxes": [
             {

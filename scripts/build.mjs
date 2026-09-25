@@ -167,8 +167,9 @@ async function build() {
     console.log('  copy  ', 'posts/' + name);
   }
 
-  /* 7. assets 静态资源：图片 / 站点图标 / 壁纸 SVG / favicon 原样复制 */
-  for (const sub of ['images', 'icons', 'wallpapers']) {
+  /* 7. assets 静态资源：图片 / 站点图标 / 壁纸 SVG / 背景视频 / favicon 原样复制。
+        videos 目录暂可不存在，walk 对缺失目录安全返回空数组 */
+  for (const sub of ['images', 'icons', 'wallpapers', 'videos']) {
     for (const name of walk(path.join('assets', sub))) {
       copyFile(path.join(ROOT, 'assets', sub, name), path.join(DIST, 'assets', sub, name));
       console.log('  copy  ', 'assets/' + sub + '/' + name);

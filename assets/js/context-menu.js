@@ -144,8 +144,17 @@
     d.appendChild(sub);
 
     function fill() {
-      sub.innerHTML = '';
       var children = buildChildren() || [];
+      /* buildChildren 可返回 Promise（变体列表异步读取数据文件）：
+         保留「加载中…」，resolve 后再替换内容 */
+      if (children && typeof children.then === 'function') {
+        children.then(function (list) {
+          sub.innerHTML = '';
+          (list || []).forEach(function (node) { sub.appendChild(node); });
+        }).catch(function () { sub.innerHTML = ''; });
+        return;
+      }
+      sub.innerHTML = '';
       children.forEach(function (node) { sub.appendChild(node); });
     }
     /* 首次 hover/focus 再构建，壁纸库此时通常已就绪 */
@@ -234,83 +243,280 @@
     return !!(sec && sec.querySelector('.screen-bg'));
   }
 
-  /* 背景/壁纸子菜单（仅右键落在「开启了背景的屏」上时出现） */
-  function bgSubmenu() {
-    if (!window.SSBScreenBG || !window.SSBScreenBG.wallpapers) return null;
+  /* 背景入口（仅右键落在「开启了背景的屏」上时出现）。
+     原为二级子菜单逐项列出全部壁纸/视频——图库会持续变长，
+     子菜单级联装不下，改为单项打开「壁纸管理」弹窗：
+     分类 tab + 方框网格直选（见下方弹窗模块） */
+  function bgEntry() {
+    if (!window.SSBApps || !window.SSBScreenBG) return null;
     if (!document.querySelector('.screen-bg')) return null;
-
-    return submenuNode('背景', null, function () {
-      var nodes = [];
-      var pref = window.SSBScreenBG.getPref();
-      var mode = pref ? pref.mode : 'default';
-
-      nodes.push(itemNode({
-        label: '无背景', checked: mode === 'none',
-        onClick: function () {
-          /* 访客主动清空该页背景（覆盖作者配置；清除偏好可恢复） */
-          window.SSBScreenBG.setPref({ mode: 'none' });
-        }
-      }));
-      nodes.push(itemNode({
-        label: '粒子动画', checked: mode === 'particles',
-        onClick: function () {
-          window.SSBScreenBG.setPref({ mode: 'particles' });
-        }
-      }));
-      nodes.push(separatorNode());
-
-      var wps = window.SSBScreenBG.wallpapers() || [];
-      wps.forEach(function (w) {
-        var selected = mode === 'wallpaper' && pref.file === w.file;
-        nodes.push(itemNode({
-          label: w.name || w.file.split('/').pop(),
-          checked: selected,
-          onClick: function () {
-            var follow = pref && pref.followTone === false ? false : true;
-            window.SSBScreenBG.setPref({
-              mode: 'wallpaper', file: w.file, tone: w.tone, followTone: follow
-            });
-          }
-        }));
-      });
-      nodes.push(itemNode({
-        label: '随机壁纸（换一张）',
-        onClick: function () {
-          window.SSBScreenBG.shuffleWallpaper();
-        }
-      }));
-      nodes.push(separatorNode());
-      nodes.push(itemNode({
-        label: '跟随壁纸明暗',
-        checked: !(pref && pref.followTone === false),
-        disabled: mode !== 'wallpaper',
-        onClick: function () {
-          var next = pref && pref.followTone === false;
-          window.SSBScreenBG.setFollowTone(next);
-          if (next) window.SSBScreenBG.setPref(window.SSBScreenBG.getPref());
-        }
-      }));
-
-      return nodes;
+    if (!window.SSBApps.backgroundApps().length) return null;
+    return itemNode({
+      label: '壁纸管理…',
+      onClick: function () { openBgModal(); }
     });
   }
 
-  function navSubmenu() {
-    var links = Array.prototype.slice.call(document.querySelectorAll('#site-nav a[href]'));
-    if (!links.length) return null;
-    return submenuNode('快捷导航', null, function () {
-      return links.map(function (a) {
-        return itemNode({
-          label: a.textContent.trim() || a.href,
-          onClick: function () { location.href = a.href; }
-        });
+  /* ---------- 壁纸管理弹窗 ----------
+     内容完全数据驱动：tab 遍历注册表 kind=background 的应用。
+     所有分类统一方框网格交互（用户拍板 2026-09-26）：
+       - 无 variants 的（粒子动画）：方框内嵌实时小预览（复用应用 render）
+       - 图片/视频：按需缓存——没选过的格只显示名字（不发请求）；
+         选过（浏览器已缓存）的格才渲染预览图 / 视频第一帧（preload=metadata，
+         不播放；只有设为壁纸后背景层才真正播放）
+       - 颜色/渐变：零加载成本，格子直接用内联 background 预览；
+         特殊值 none = 无背景（替代旧的「无背景」开关）
+     以后新增背景类型（含第二个粒子）无需改本文件。
+     选择与偏好写 localStorage（ssb.bg-pref），由 SSBScreenBG 统一应用；
+     操作后弹窗保持打开，方便连续挑选对比 */
+  var bgModalEl = null;      /* 当前打开的弹窗遮罩（null=未打开） */
+  var bgModalTab = '';       /* 当前选中的背景应用 id */
+  var bgModalPreviews = [];  /* 弹窗内实时预览的 destroy 函数（切 tab/关闭时调用） */
+
+  /* 按需缓存的已见集合：记录选过的图片/视频路径（localStorage ssb.bg-seen）。
+     只有见过的格子才渲染预览——没选过的不发任何媒体请求 */
+  var BG_SEEN_KEY = 'ssb.bg-seen';
+  function bgSeenMap() {
+    try { return JSON.parse(localStorage.getItem(BG_SEEN_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function bgSeenAdd(v) {
+    if (!v) return;
+    var s = bgSeenMap();
+    s[v] = 1;
+    try { localStorage.setItem(BG_SEEN_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  function cleanupBgPreviews() {
+    bgModalPreviews.forEach(function (fn) { try { fn(); } catch (e) {} });
+    bgModalPreviews = [];
+  }
+
+  function openBgModal() {
+    closeBgModal();
+    var bgApps = window.SSBApps.backgroundApps();
+
+    var mask = document.createElement('div');
+    mask.className = 'ssb-bg-mask';
+    mask.innerHTML =
+      '<div class="ssb-bg-card">' +
+        '<div class="ssb-bg-head"><span class="ssb-bg-title">壁纸管理</span>' +
+          '<button type="button" class="ssb-bg-close" title="关闭">×</button></div>' +
+        '<div class="ssb-bg-tabs"></div>' +
+        '<div class="ssb-bg-body"></div>' +
+      '</div>';
+    document.body.appendChild(mask);
+    bgModalEl = mask;
+
+    /* 点遮罩空白 / × / Esc 关闭；卡片内部点击 target 不是 mask，自然不关 */
+    mask.addEventListener('click', function (e) {
+      if (e.target === mask) closeBgModal();
+    });
+    mask.querySelector('.ssb-bg-close').addEventListener('click', closeBgModal);
+    document.addEventListener('keydown', bgModalEsc);
+
+    /* 默认打开当前偏好所在的 tab */
+    var pref = window.SSBScreenBG.getPref();
+    var hit = pref && pref.mode === 'app' &&
+      bgApps.filter(function (d) { return d.id === pref.app; })[0];
+    bgModalTab = (hit || bgApps[0]).id;
+
+    renderBgTabs(bgApps);
+    renderBgBody();
+  }
+
+  function bgModalEsc(e) {
+    if (e.key === 'Escape') closeBgModal();
+  }
+
+  function closeBgModal() {
+    if (!bgModalEl) return;
+    document.removeEventListener('keydown', bgModalEsc);
+    cleanupBgPreviews();
+    bgModalEl.remove();
+    bgModalEl = null;
+  }
+
+  /* 每次选择操作后刷新选中态（tab 位置不动） */
+  function refreshBgModal() {
+    if (!bgModalEl) return;
+    renderBgTabs(window.SSBApps.backgroundApps());
+    renderBgBody();
+  }
+
+  function renderBgTabs(bgApps) {
+    var tabs = bgModalEl.querySelector('.ssb-bg-tabs');
+    tabs.innerHTML = '';
+    bgApps.forEach(function (def) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ssb-bg-tab' + (def.id === bgModalTab ? ' active' : '');
+      b.textContent = def.name;
+      b.addEventListener('click', function () {
+        if (bgModalTab === def.id) return;
+        bgModalTab = def.id;
+        renderBgTabs(bgApps);
+        renderBgBody();
       });
+      tabs.appendChild(b);
+    });
+  }
+
+  function currentBgApp() {
+    var list = window.SSBApps.backgroundApps();
+    return list.filter(function (d) { return d.id === bgModalTab; })[0] || list[0];
+  }
+
+  /* 无 variants 应用的参数默认值（schema.def），再叠加 pages.json 的作者配置，
+     让弹窗预览尽量贴近真实效果 */
+  function schemaDefaults(def) {
+    var out = {};
+    (def.configSchema || []).forEach(function (s) {
+      if (s.def !== undefined) window.SSBApps.setPath(out, s.key, s.def);
+    });
+    return out;
+  }
+
+  function renderBgBody() {
+    var body = bgModalEl.querySelector('.ssb-bg-body');
+    cleanupBgPreviews();   /* 旧 tab 的实时预览先销毁，避免残留 RAF */
+    var def = currentBgApp();
+    var pref = window.SSBScreenBG.getPref();
+    var isCur = !!(pref && pref.mode === 'app' && pref.app === def.id);
+
+    /* ---- 无变体的背景应用（粒子动画）：方框内嵌实时小预览 ---- */
+    if (!def.variants) {
+      body.innerHTML = '<div class="ssb-bg-tip">加载中…</div>';
+      var tabAtCall0 = def.id;
+      /* 读 pages.json 拿作者在后台调的参数（LS 优先，与前台读取约定一致） */
+      U.loadDataFile('data/pages.json').then(function (pages) {
+        if (!bgModalEl || bgModalTab !== tabAtCall0) return;
+        body.innerHTML = '';
+        var grid = document.createElement('div');
+        grid.className = 'ssb-bg-grid';
+
+        var cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'ssb-bg-cell ssb-bg-cell-live' + (isCur ? ' active' : '');
+        cell.innerHTML =
+          '<div class="ssb-bg-live"></div>' +
+          '<span class="ssb-bg-cell-name">' + U.escapeHTML(def.name) + '</span>';
+        cell.addEventListener('click', function () {
+          window.SSBScreenBG.pick(def.id, '', '').then(refreshBgModal);
+        });
+        grid.appendChild(cell);
+        body.appendChild(grid);
+
+        var author = (pages && pages.apps && pages.apps[def.id]) || {};
+        var cfg = Object.assign(schemaDefaults(def), author);
+        /* 小方框里按原参数会满屏大圆：缩小尺寸上限，保留配色/速度风格 */
+        if (def.id === 'particles') {
+          cfg.count = Math.min(Number(cfg.count) || 6, 6);
+          cfg.sizeMin = 3;
+          cfg.sizeMax = 12;
+        }
+        /* 复用应用自己的 render 跑实时预览；render 抛错收敛为名字块 */
+        var mount = cell.querySelector('.ssb-bg-live');
+        try {
+          var destroy = def.render(mount, { cfg: cfg });
+          if (typeof destroy === 'function') bgModalPreviews.push(destroy);
+          else if (destroy === false) mount.remove();   /* render 空层：仅名字 */
+        } catch (e) {
+          mount.remove();
+        }
+      }).catch(function () {
+        if (bgModalEl && bgModalTab === tabAtCall0) {
+          body.innerHTML = '<div class="ssb-bg-tip">加载失败，请重试</div>';
+        }
+      });
+      return;
+    }
+
+    /* ---- 有变体（壁纸/视频/颜色）：方框网格，数据异步加载 ---- */
+    body.innerHTML = '<div class="ssb-bg-tip">加载中…</div>';
+    var tabAtCall = def.id;
+    def.variants().then(function (list) {
+      /* 异步返回时弹窗可能已关闭或用户已切 tab，避免错画 */
+      if (!bgModalEl || bgModalTab !== tabAtCall) return;
+      var prefNow = window.SSBScreenBG.getPref();
+      var curVariant = prefNow && prefNow.mode === 'app' && prefNow.app === def.id
+        ? prefNow.variant : null;
+      var seen = bgSeenMap();
+
+      body.innerHTML = '';
+      if (!list.length) {
+        body.innerHTML = '<div class="ssb-bg-tip">这个分类还是空的</div>';
+        return;
+      }
+
+      var grid = document.createElement('div');
+      grid.className = 'ssb-bg-grid';
+
+      list.forEach(function (v) {
+        var val = v.value || '';
+        var sel = curVariant === val;
+        var cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'ssb-bg-cell' + (sel ? ' active' : '');
+
+        if (val === 'none') {
+          /* 无背景格：斜纹表示空 */
+          cell.className += ' ssb-bg-cell-none';
+          cell.innerHTML = '<span class="ssb-bg-cell-vname">' +
+            U.escapeHTML(v.label) + '</span>';
+        } else if (/\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(val)) {
+          /* 图片：已缓存（选过/正在用）才渲染预览图，否则名字块 */
+          if (seen[val] || sel) {
+            cell.innerHTML =
+              '<img src="' + U.escapeHTML(U.ROOT + val) + '" alt="" loading="lazy">' +
+              '<span class="ssb-bg-cell-name">' + U.escapeHTML(v.label) + '</span>';
+          } else {
+            cell.className += ' ssb-bg-cell-file';
+            cell.innerHTML = '<span class="ssb-bg-cell-vname">' +
+              U.escapeHTML(v.label) + '</span>';
+          }
+        } else if (/\.(mp4|webm|ogv|ogg|mov|m4v)$/i.test(val)) {
+          /* 视频：已缓存才挂 <video preload=metadata> 显示第一帧（不播放） */
+          if (seen[val] || sel) {
+            cell.innerHTML =
+              '<video class="ssb-bg-vthumb" muted preload="metadata" playsinline src="' +
+                U.escapeHTML(U.ROOT + val) + '"></video>' +
+              '<span class="ssb-bg-cell-vtag">视频</span>' +
+              '<span class="ssb-bg-cell-name">' + U.escapeHTML(v.label) + '</span>';
+          } else {
+            cell.className += ' ssb-bg-cell-file';
+            cell.innerHTML =
+              '<span class="ssb-bg-cell-vname">' + U.escapeHTML(v.label) + '</span>' +
+              '<span class="ssb-bg-cell-vtag">视频</span>';
+          }
+        } else {
+          /* 颜色/渐变：零加载成本，格子直接内联背景预览；
+             名称用药丸底保证任何底色上可读 */
+          cell.className += ' ssb-bg-cell-color';
+          cell.style.background = val;
+          cell.innerHTML = '<span class="ssb-bg-cell-cname">' +
+            U.escapeHTML(v.label) + '</span>';
+        }
+
+        cell.addEventListener('click', function () {
+          window.SSBScreenBG.pick(def.id, val, v.tone || '').then(function () {
+            bgSeenAdd(val);   /* 选过即已加载，记入已见集合 */
+            refreshBgModal();
+          });
+        });
+        grid.appendChild(cell);
+      });
+
+      body.appendChild(grid);
+    }).catch(function () {
+      if (bgModalEl && bgModalTab === tabAtCall) {
+        body.innerHTML = '<div class="ssb-bg-tip">加载失败，请重试</div>';
+      }
     });
   }
 
   /* ---------- 「主题模式」子菜单：自动（跟随系统）/ 亮色 / 暗色 ----------
-     勾选态和切换都走 common.js 暴露的 BlogUtils 三态接口，
-     头部三段开关与右键菜单永远同步 */
+     勾选态和切换都走 common.js 暴露的 BlogUtils 三态接口 */
   var THEME_OPTIONS = [
     { mode: 'auto', label: '自动（跟随系统）', icon: 'auto' },
     { mode: 'light', label: '亮色', icon: 'sun' },
@@ -319,6 +525,16 @@
 
   function themeSubmenu() {
     return submenuNode('主题模式', U ? U.icon('auto') : '', function () {
+      /* 壁纸基调锁定中：亮暗由壁纸决定，只展示当前锁定态，不可切换 */
+      var lock = U.getToneLock ? U.getToneLock() : '';
+      if (lock === 'light' || lock === 'dark') {
+        return [itemNode({
+          label: (lock === 'light' ? '亮色' : '暗色') + '（跟随壁纸基调）',
+          icon: U ? U.icon(lock === 'light' ? 'sun' : 'moon') : '',
+          checked: true,
+          disabled: true
+        })];
+      }
       var current = U.getThemeMode();
       return THEME_OPTIONS.map(function (opt) {
         return itemNode({
@@ -365,7 +581,7 @@
 
     common.push(themeSubmenu());
 
-    var bg = screenAllowsBg(target) ? bgSubmenu() : null;
+    var bg = screenAllowsBg(target) ? bgEntry() : null;
     if (bg) common.push(bg);
 
     common.push(separatorNode());
@@ -381,9 +597,6 @@
       label: '复制本页链接',
       onClick: function () { copyText(location.href); }
     }));
-
-    var nav = navSubmenu();
-    if (nav) common.push(nav);
 
     common.forEach(function (n) { m.appendChild(n); });
   }

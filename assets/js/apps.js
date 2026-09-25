@@ -55,8 +55,14 @@
   var appsPromise = null;     /* loadApplications 的去重句柄 */
 
   /* 应用注册：应用文件里调用 SSBApps.define(def)。
-     def = { id, name, desc, hero, configSchema:[{key,label,type,def,...}],
-             css:'样式字符串', render(mount,ctx), wheel?(delta,zoneEl) } */
+     def = { id, name, desc, hero, kind:'app'|'background',
+             configSchema:[{key,label,type,def,...}], css:'样式字符串',
+             variants?():Promise<[{value,label,tone}]>,
+             render(mount,ctx), wheel?(delta,zoneEl) }
+     kind='background' 的背景应用不挂盒子：渲染到屏的 .screen-bg 层，
+     由 pages.json 的 screens[].bg.app 引用，参数只有两层（无实例 cfg）；
+     variants 用于「一种背景内含多个可选项」（壁纸库/视频库），
+     后台背景类型与右键菜单据此自动列出，新增背景类型无需改别处 */
   function define(def) {
     def = def || {};
     if (!def.id || typeof def.id !== 'string') throw new Error('define 缺少合法 id');
@@ -70,11 +76,13 @@
       name: String(def.name || def.id),
       desc: String(def.desc || ''),
       hero: def.hero === true,
+      kind: def.kind === 'background' ? 'background' : 'app',
       /* 数据文件路由以清单为准（清单不管代码内部，只管仓库文件路由） */
       dataFile: (pendingMeta && pendingMeta.dataFile) ? String(pendingMeta.dataFile) : '',
       builtin: !!(pendingMeta && pendingMeta.builtin),
       configSchema: Array.isArray(def.configSchema) ? def.configSchema : [],
       css: typeof def.css === 'string' ? def.css : '',
+      variants: typeof def.variants === 'function' ? def.variants : null,
       render: def.render,
       wheel: typeof def.wheel === 'function' ? def.wheel : null
     };
@@ -396,14 +404,21 @@
     return data;
   }
 
-  /* 屏背景只允许 none|particles|wallpaper：
-     none=不渲染背景层（最省资源，访客右键菜单也不出现背景组）；
-     缺失/非法一律归一为 none，壁纸必须保留 file */
+  /* 屏背景：app=背景应用 id（开启背景层），variant=该应用内具体选项
+     （壁纸/视频文件，粒子无变体）；旧版 particles/wallpaper 自动迁移，
+     缺失/非法归一为 none。
+     不在此校验 app 是否注册——数据可能引用了已删除的应用：渲染时留空层、
+     后台仍显示原值，避免静默丢失配置 */
   function normalizeScreenBg(sc) {
-    var t = sc.bg && sc.bg.type;
-    if (t === 'particles') { sc.bg = { type: 'particles' }; return; }
+    var b = sc && sc.bg;
+    if (b && typeof b.app === 'string' && b.app) {
+      sc.bg = b.variant ? { app: b.app, variant: String(b.variant) } : { app: b.app };
+      return;
+    }
+    var t = b && b.type;
+    if (t === 'particles') { sc.bg = { app: 'particles' }; return; }
     if (t === 'wallpaper') {
-      sc.bg = sc.bg.file ? { type: 'wallpaper', file: sc.bg.file } : { type: 'none' };
+      sc.bg = b.file ? { app: 'wallpapers', variant: String(b.file) } : { app: 'wallpapers' };
       return;
     }
     sc.bg = { type: 'none' };
@@ -488,14 +503,15 @@
       sec.dataset.screen = String(si);
       sec.dataset.si = String(si);
 
-      /* 背景层：仅 particles|wallpaper 才渲染。none（背景开关关闭）
-         不出层——零渲染开销，访客右键菜单也据此隐藏背景组 */
+      /* 背景层：配置了背景应用（bg.app）才渲染。none（背景开关关闭）
+         不出层——零渲染开销，访客右键菜单也据此隐藏背景组。
+         层内容由 common.js 的 SSBScreenBG 在本页渲染后填充 */
       var bgConf = screen.bg || { type: 'none' };
-      if (bgConf.type === 'particles' || bgConf.type === 'wallpaper') {
+      if (bgConf.app) {
         var bgEl = document.createElement('div');
-        bgEl.className = 'screen-bg screen-bg-' + bgConf.type;
-        bgEl.dataset.bgType = bgConf.type;
-        if (bgConf.file) bgEl.dataset.bgFile = bgConf.file;
+        bgEl.className = 'screen-bg';
+        bgEl.dataset.bgApp = bgConf.app;
+        if (bgConf.variant) bgEl.dataset.bgVariant = bgConf.variant;
         sec.appendChild(bgEl);
       }
 
@@ -641,8 +657,11 @@
       document.head.appendChild(styleEl);
     }
 
-    /* 结构就绪：common.js 背景系统据此初始化各屏背景 */
-    document.dispatchEvent(new CustomEvent('ssb-page-rendered', { detail: { page: page, screens: screens } }));
+    /* 结构就绪：common.js 背景系统据此初始化各屏背景。
+       globalApps 一并传出，背景应用参数（两层合并）不必再二次拉取 pages.json */
+    document.dispatchEvent(new CustomEvent('ssb-page-rendered', {
+      detail: { page: page, screens: screens, globalApps: data.apps || {} }
+    }));
 
     /* 首次渲染一次性回顶：scrollRestoration=manual 已阻止恢复，
        这里兜底渲染完成瞬间把残留偏移归零。直接赋值 scrollTop 是 instant
@@ -712,6 +731,13 @@
     appDefaults: appDefaults,
     getPath: getPath,
     setPath: setPath,
+    deepMerge: deepMerge,
+    /* 背景类应用清单（后台背景类型 select / 右键菜单数据源），
+       数组顺序 = 清单注册顺序（manifest 顺序，保证选项稳定） */
+    backgroundApps: function () {
+      return manifest.apps.map(function (m) { return registry[m.id]; })
+        .filter(function (d) { return d && d.kind === 'background'; });
+    },
     normalizeV3: normalizeV3,
     /* 响应式规则清洗 + 层级/属性元数据（构造模板与自定义规则编辑器） */
     sanitizeRule: sanitizeRule,

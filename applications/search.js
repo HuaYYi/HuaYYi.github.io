@@ -2,7 +2,7 @@
    SSB 应用：外站搜索框（search）
    数据文件：data/search-engines.json（{name, url 前缀} 数组）
    引擎选择存 localStorage（多实例共享同一选择）；
-   图标用 assets/icons/sites/<域名>.png 本地副本，无本地图标/加载失败
+   图标用 assets/icons/sites/<域名>.webp 本地副本，无本地图标/加载失败
    固定回退首字母，前台不直连外站 favicon；后台保存时自动匹配。所有 DOM
    操作按 box 作用域，支持多实例
    ============================================================ */
@@ -219,7 +219,7 @@
   });
 
   /* 引擎图标：条目带 __icon（本地已保存未提交的临时匹配）优先用临时 dataURL；
-     否则用仓库本地图标 assets/icons/sites/<hostname>.png（同域快）。
+     否则用仓库本地图标 assets/icons/sites/<hostname>.webp（同域快）。
      无 URL/非法协议/加载失败固定回退首字母——运行时不直连外站 favicon。
      img 用 DOM API 创建并以 addEventListener 挂 error（避免在 innerHTML
      字符串里拼接站点名，引号可破坏属性） */
@@ -230,7 +230,7 @@
     try {
       var u = new URL(item.url);
       if (!/^https?:$/.test(u.protocol)) return { type: 'text', text: (name || '?').slice(0, 1) };
-      return { type: 'img', src: U.ROOT + 'assets/icons/sites/' + u.hostname + '.png' };
+      return { type: 'img', src: U.ROOT + 'assets/icons/sites/' + u.hostname + '.webp' };
     } catch (e) {
       return { type: 'text', text: (name || '?').slice(0, 1) };
     }

@@ -4,14 +4,16 @@
    职责：
    1. 读取 site-config.json，渲染顶部导航（含站内搜索）与页脚
    2. 根据 config.theme.primary 自动派生深色/浅色，注入 :root CSS 变量
-   3. 根据 config.background 渲染动态背景（粒子 / 图片 / 视频 / 关闭）
+   3. SSBScreenBG：按「背景类应用」分发渲染屏背景（粒子 / 壁纸 / 视频 / 关闭），
+      并响应访客右键菜单的选择（偏好存 localStorage）
    4. 提供 BlogUtils 对象给各页面脚本使用（ROOT、fetchJSON、escapeHTML、
       icon、postHref、getPosts、本地存储工具等）
 
    启动流程：
-   DOMContentLoaded → fetch site-config.json → applyTheme → initBackground
-     → renderHeader → renderFooter → dispatch('ssb-config-ready')
+   DOMContentLoaded → fetch site-config.json → applyTheme → renderHeader
+     → renderFooter → dispatch('ssb-config-ready')
      → window.initPage(config)  // 各页面自己的初始化钩子
+     （页面渲染后 ssb-page-rendered → SSBScreenBG.init）
 
    本地存储工作流：
      后台所有改动（文章/配置/应用数据）先写入浏览器 localStorage，
@@ -137,6 +139,8 @@
        实现见下方主题区块，函数声明提升，这里可直接引用） */
     getThemeMode: function () { return themeMode(); },
     setThemeMode: function (mode) { setThemeMode(mode); },
+    /* 当前壁纸基调锁：''=未锁定可自由切换；light/dark=主题被壁纸基调锁定 */
+    getToneLock: function () { return screenBG.toneLock; },
 
     /* 读取并缓存文章列表，按日期倒序；本地保存的文章会并入列表。
        合并按 file 去重：同一篇文章正在本地编辑时，本地条目覆盖仓库条目，
@@ -218,65 +222,32 @@
   }
 
   /* 只设置「当前生效」的亮暗，不写偏好模式（壁纸明暗联动专用）。
-     主色在暗/亮下派生规则不同，所以要重新 applyTheme；
-     再同步头部/抽屉里三段开关的选中态 */
+     主色在暗/亮下派生规则不同，所以要重新 applyTheme */
   function applyResolvedTheme(tone) {
     document.documentElement.dataset.theme = tone;
     applyTheme(BlogUtils.config);
-    updateThemeUI(themeMode());
   }
 
-  /* 用户选择偏好模式（头部/抽屉三段开关、右键菜单「主题模式」子菜单共用） */
+  /* 用户选择偏好模式（右键菜单「主题模式」子菜单调用）。
+     壁纸基调锁定中（screenBG.toneLock 非空）直接忽略——
+     亮暗由壁纸基调决定，只有基调为「无」的背景才允许自由切换 */
   function setThemeMode(mode) {
     if (mode !== 'auto' && mode !== 'light' && mode !== 'dark') return;
+    if (screenBG.toneLock) return;
     try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 忽略写入失败 */ }
-    /* 手动表态后关闭壁纸明暗跟随，避免壁纸重新应用时又带跑主题；
-       auto 模式下不关闭，保持「跟随系统」的默认体验 */
-    if (mode !== 'auto' && window.SSBScreenBG) window.SSBScreenBG.setFollowTone(false);
     applyResolvedTheme(resolveTheme(BlogUtils.config));
   }
 
-  /* 同步所有三段开关：.active 打在当前模式上，title 写清含义 */
-  function updateThemeUI(mode) {
-    document.querySelectorAll('.theme-switch').forEach(function (box) {
-      box.querySelectorAll('[data-theme-mode]').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.themeMode === mode);
-        var label = btn.dataset.themeMode === 'auto'
-          ? '自动（跟随系统）'
-          : (btn.dataset.themeMode === 'light' ? '亮色模式' : '暗色模式');
-        btn.title = label;
-        btn.setAttribute('aria-label', label);
-      });
-    });
-  }
-
-  /* 事件委托绑定一次：桌面头部和移动抽屉里的三段开关共用 .theme-switch */
-  if (!window.__themeBound) {
-    window.__themeBound = true;
-    document.addEventListener('click', function (e) {
-      if (e.target && typeof e.target.closest === 'function') {
-        var btn = e.target.closest('.theme-switch [data-theme-mode]');
-        if (btn) setThemeMode(btn.dataset.themeMode);
+  /* auto 模式实时跟随系统外观变化；壁纸基调锁定期间不响应 */
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function () {
+      if (themeMode() === 'auto' && !screenBG.toneLock) {
+        applyResolvedTheme(resolveTheme(BlogUtils.config));
       }
-    });
-    /* auto 模式实时跟随系统外观变化（不刷新页面也能切换） */
-    if (window.matchMedia) {
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      var onSystemChange = function () {
-        if (themeMode() === 'auto') applyResolvedTheme(resolveTheme(BlogUtils.config));
-      };
-      if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
-      else mq.addListener(onSystemChange);  /* 旧 Safari 兼容 */
-    }
-  }
-
-  /* 三段主题开关 HTML（桌面头部 / 移动抽屉共用，选中态由 updateThemeUI 同步） */
-  function themeSwitchHTML() {
-    return '<div class="theme-switch" role="group" aria-label="主题模式">' +
-      '<button type="button" data-theme-mode="auto">' + BlogUtils.icon('auto') + '</button>' +
-      '<button type="button" data-theme-mode="light">' + BlogUtils.icon('sun') + '</button>' +
-      '<button type="button" data-theme-mode="dark">' + BlogUtils.icon('moon') + '</button>' +
-    '</div>';
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else mq.addListener(onSystemChange);  /* 旧 Safari 兼容 */
   }
 
   function renderHeader(config) {
@@ -301,7 +272,6 @@
               '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
               '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
             '</nav>' +
-            themeSwitchHTML() +
             '<div class="site-search">' +
               '<input type="text" id="site-search-input" placeholder="搜索文章" autocomplete="off">' +
               '<button class="search-btn" type="button" aria-label="搜索">' + BlogUtils.icon('search') + '</button>' +
@@ -319,8 +289,6 @@
           '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
           '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
         '</nav>' +
-        themeSwitchHTML() +
-        '<div class="theme-switch-hint">自动跟随系统 · 亮色 · 暗色</div>' +
         '<div class="mobile-search">' +
           '<input type="text" id="mobile-search-input" placeholder="搜索文章">' +
           '<button class="search-btn" type="button" aria-label="搜索">' + BlogUtils.icon('search') + '</button>' +
@@ -332,7 +300,6 @@
     highlightNav();
     bindSiteSearch();
     bindMobileDrawer();
-    updateThemeUI(themeMode());
     /* 导航项来自 pages.json 的页面列表（后台「页面管理」维护）：
        上面的三条默认链接是兜底，pages.json 读取成功后覆盖渲染 */
     renderNavFromPages();
@@ -696,35 +663,58 @@
   }
 
   /* ============================================================
-     屏级背景系统（v3）
+     屏级背景系统（v4：背景即应用）
      ------------------------------------------------------------
      apps.js 把每个屏渲染成 .page-screen > .screen-bg（空层）+ 内容，
-     本系统在 ssb-page-rendered 后为每层填充实际背景：
+     本系统在 ssb-page-rendered 后按「背景应用」填充每层：
 
      屏配置（pages.json 的 screens[].bg，写在 dataset 上）：
-       default   — landing 第一屏沿用站点设置 config.background
-                   （保持首页背景与站点配置联动）；其余屏为透明底色
-       particles — Canvas 粒子（参数取站点 background）
-       wallpaper — 壁纸（data-bg-file 指定，留空按屏稳定随机）
+       {app:'背景应用 id', variant?:'应用内选项'}；无 app=不渲染背景层。
+       背景应用在 applications/*.js 用 kind:'background' 声明；
+       粒子无 variant，壁纸/视频的 variant=具体文件（留空稳定随机）。
 
      访客偏好（localStorage 'ssb.bg-pref'，由全站右键菜单写入）：
-       { mode:'default'|'particles'|'wallpaper', file?:具体壁纸,
-         followTone?:bool }
-       mode 非 default 时覆盖所有屏；壁纸选中后可按 tone 自动切主题。
-     壁纸清单来自 data/wallpapers.json，图床加载失败回退普通底色。
-     多个粒子层用 IntersectionObserver 按可见性暂停动画，节省 CPU。
+       null                              跟随作者（默认）
+       {mode:'none'}                     强制无背景
+       {mode:'app', app, variant?, tone?}
+     mode=app 覆盖所有屏。
+
+     明暗基调锁定（2026-09-26）：任何生效背景带 tone=light/dark
+     （壁纸/视频/颜色的变体字段，粒子在应用参数里配）即把整站主题
+     锁定为对应亮暗——不可切换、不改写 ssb.theme；所有背景基调
+     为「无」时才恢复自由切换。访客选择与作者配置一视同仁。
+     背景资源加载失败回退普通底色；动态背景（粒子/视频）由应用自己
+     用 IntersectionObserver 按可见性暂停，节省 CPU。
      ============================================================ */
   var BG_PREF_KEY = 'ssb.bg-pref';
   var screenBG = {
-    list: [],        /* 当前页所有背景层状态 {layer, section, resolved:{type,file,tone}, ctl} */
-    wallpapers: [],
-    pref: null
+    list: [],          /* 当前页所有背景层状态 {layer, section, resolved, ctl} */
+    globalApps: {},    /* pages.json 顶层 apps：背景应用参数（两层合并） */
+    pref: null,
+    toneLock: ''       /* 当前基调锁：''=未锁定；light/dark=被壁纸基调锁定 */
   };
+
+  /* 旧版偏好（mode=particles|wallpaper）一次性迁移到 v4 结构，
+     老访客升级后选择不丢；迁移结果写回，下次直接读新格式 */
+  function migratePref(p) {
+    if (!p || p.mode === 'none' || p.mode === 'app') return p;
+    if (p.mode === 'particles') return { mode: 'app', app: 'particles' };
+    if (p.mode === 'wallpaper') {
+      return {
+        mode: 'app', app: 'wallpapers',
+        variant: p.file || '', tone: p.tone
+      };
+    }
+    return null;   /* 陈旧/非法值：回落跟随作者 */
+  }
 
   function readBgPref() {
     try {
       var raw = localStorage.getItem(BG_PREF_KEY);
-      screenBG.pref = raw ? JSON.parse(raw) : null;
+      var parsed = raw ? JSON.parse(raw) : null;
+      var p = migratePref(parsed);
+      if (JSON.stringify(p) !== JSON.stringify(parsed)) writeBgPref(p);
+      screenBG.pref = p;
     } catch (e) { screenBG.pref = null; }
     return screenBG.pref;
   }
@@ -737,20 +727,7 @@
     } catch (e) { /* 隐私模式忽略 */ }
   }
 
-  /* 加载壁纸库（带缓存，失败不影响主流程） */
-  var wallpapersPromise = null;
-  function loadWallpapers() {
-    if (wallpapersPromise) return wallpapersPromise;
-    wallpapersPromise = BlogUtils.loadDataFile('data/wallpapers.json')
-      .then(function (data) {
-        screenBG.wallpapers = (data && Array.isArray(data.wallpapers)) ? data.wallpapers : [];
-        return screenBG.wallpapers;
-      })
-      .catch(function () { screenBG.wallpapers = []; return []; });
-    return wallpapersPromise;
-  }
-
-  /* 简单稳定 hash：屏级壁纸留空时，让每屏稳定抽到同一张，刷新不乱跳 */
+  /* 简单稳定 hash：变体留空时让每个 key（全局/某屏）稳定抽到同一项，刷新不乱跳 */
   function hashIndex(str, n) {
     if (n <= 0) return 0;
     var h = 0;
@@ -758,49 +735,71 @@
     return h % n;
   }
 
-  /* 解析某一层最终生效的背景（先访客偏好，后屏配置）。
-     能进到这里的都是作者开启了背景的屏（bg.type=particles|wallpaper）；
-     开关关闭（none）的屏根本不渲染 .screen-bg，访客偏好也无法给它加背景 */
-  function resolveLayerBg(layer, section) {
-    var pref = screenBG.pref;
-
-    /* 访客选「无背景」：作者开启的背景层也强制留空（只保留透明层） */
-    if (pref && pref.mode === 'none') {
-      return { type: 'default' };
-    }
-    if (pref && pref.mode === 'particles') {
-      return { type: 'particles' };
-    }
-    if (pref && pref.mode === 'wallpaper') {
-      var list = screenBG.wallpapers;
-      var wp = null;
-      if (pref.file) {
-        wp = list.filter(function (w) { return w.file === pref.file; })[0] || { file: pref.file, tone: pref.tone };
-      } else if (list.length) {
-        wp = list[hashIndex('global', list.length)];
-        writeBgPref(Object.assign({}, pref, { file: wp.file, tone: wp.tone }));
-      }
-      if (wp) return { type: 'wallpaper', file: wp.file, tone: wp.tone, followTone: pref.followTone !== false };
-    }
-
-    var type = layer.dataset.bgType || 'default';
-    if (type === 'particles') return { type: 'particles' };
-    if (type === 'wallpaper') {
-      var f = layer.dataset.bgFile || '';
-      var item = null;
-      if (f) {
-        item = screenBG.wallpapers.filter(function (w) { return w.file === f; })[0] || { file: f };
-      } else if (screenBG.wallpapers.length) {
-        item = screenBG.wallpapers[hashIndex(section.dataset.screen || '0', screenBG.wallpapers.length)];
-      }
-      if (item) return { type: 'wallpaper', file: item.file, tone: item.tone, followTone: false };
-      return { type: 'default' };   /* 壁纸列表为空等异常：空层兜底 */
-    }
-
-    return { type: 'default' };
+  /* 取背景应用的变体列表（无 variants 钩子=无变体，如粒子） */
+  function variantList(def) {
+    return def.variants ? def.variants() : Promise.resolve([]);
   }
 
-  /* 清掉一层旧内容并销毁旧控制器（粒子 RAF / 监听器） */
+  /* 解析某一层最终生效的背景（先访客偏好，后屏配置）。异步：壁纸/视频的
+     变体列表要从应用数据文件读取。能进到这里的都是作者开启了背景层的屏
+     （bg.app）；没有 .screen-bg 的屏，访客偏好也无法给它加背景 */
+  function resolveState(state) {
+    var layer = state.layer;
+    var pref = screenBG.pref;
+
+    /* 访客选「无背景」：作者开启的背景层也强制留空 */
+    if (pref && pref.mode === 'none') return Promise.resolve({ kind: 'empty' });
+
+    if (pref && pref.mode === 'app') {
+      var def = window.SSBApps.registry[pref.app];
+      if (!def || def.kind !== 'background') return Promise.resolve({ kind: 'empty' });
+
+      return variantList(def).then(function (list) {
+        /* 无变体（粒子）：基调从应用参数读取（两层合并，与 applyState 同源） */
+        if (!def.variants) {
+          var cfg0 = window.SSBApps.deepMerge(
+            window.SSBApps.appDefaults(def),
+            screenBG.globalApps[def.id] || {}
+          );
+          return { app: def.id, tone: cfg0.tone || '' };
+        }
+        if (!list.length) return { kind: 'empty' };
+
+        var hit = list.filter(function (v) { return v.value === pref.variant; })[0];
+        if (!hit) {
+          /* 未指定或指定项已被删：全局稳定抽一个并写回偏好（保持原行为） */
+          hit = list[hashIndex('global', list.length)];
+          writeBgPref(Object.assign({}, pref, { variant: hit.value, tone: hit.tone || '' }));
+        }
+        return { app: def.id, variant: hit.value, tone: hit.tone || '' };
+      });
+    }
+
+    /* 无访客偏好：跟随作者（init 时固化的配置，非动态 dataset） */
+    var appId = state.authorApp;
+    var sdef = window.SSBApps.registry[appId];
+    if (!sdef || sdef.kind !== 'background') return Promise.resolve({ kind: 'empty' });
+
+    return variantList(sdef).then(function (list) {
+      if (!sdef.variants) {
+        var cfg1 = window.SSBApps.deepMerge(
+          window.SSBApps.appDefaults(sdef),
+          screenBG.globalApps[sdef.id] || {}
+        );
+        return { app: sdef.id, tone: cfg1.tone || '' };
+      }
+      if (!list.length) return { kind: 'empty' };
+
+      var item = list.filter(function (v) { return v.value === state.authorVariant; })[0];
+      if (!item) {
+        /* 屏未指定或指定项已删：按屏稳定随机（不写偏好，不打扰访客） */
+        item = list[hashIndex(state.section.dataset.screen || '0', list.length)];
+      }
+      return { app: sdef.id, variant: item.value, tone: item.tone || '' };
+    });
+  }
+
+  /* 清掉一层旧内容并销毁旧控制器（粒子 RAF / 视频播放 / 监听器） */
   function clearLayer(state) {
     if (state.ctl) {
       try { state.ctl.destroy(); } catch (e) {}
@@ -811,330 +810,149 @@
     state.resolved = null;
   }
 
-  function applyLayer(state) {
-    var resolved = resolveLayerBg(state.layer, state.section);
-    state.resolved = resolved;
-    state.layer.className = state.layer.className.replace(/\bscreen-bg-\S+/g, '').trim();
-    state.layer.classList.add('screen-bg-' + resolved.type);
-
-    if (resolved.type === 'particles') {
-      var bgConf = (BlogUtils.config && BlogUtils.config.background) || {};
-      state.ctl = initParticles(state.layer, bgConf, state.section);
-      return resolved;
-    }
-
-    if (resolved.type === 'wallpaper' && resolved.file) {
-      var img = document.createElement('img');
-      img.className = 'screen-bg-img';
-      img.alt = '';
-      img.src = ROOT + resolved.file;
-      /* 加载失败：回退普通底色（移除 wallpaper 类避免遮罩盖住页面） */
-      img.addEventListener('error', function () {
-        state.layer.classList.remove('screen-bg-wallpaper');
+  /* 填充一层：解析后交给对应背景应用 render。
+     render 返回函数=destroy（动态背景必需）；返回 false 或 Promise resolve
+     false=无内容（图库空等异常），留空层兜底 */
+  function applyState(state) {
+    return resolveState(state).then(function (resolved) {
+      state.resolved = resolved;
+      state.layer.className = state.layer.className.replace(/\bscreen-bg-\S+/g, '').trim();
+      /* dataset 同步实际生效的背景（apps.js 只在初次渲染时按作者配置设过，
+         访客切换后必须更新，DOM 才能反映真实状态） */
+      if (resolved.kind === 'empty' || !resolved.app) {
+        state.layer.dataset.bgApp = '';
+        state.layer.dataset.bgVariant = '';
         state.layer.classList.add('screen-bg-empty');
-        img.remove();
-      });
-      state.layer.appendChild(img);
-      var overlay = document.createElement('div');
-      overlay.className = 'screen-bg-overlay';
-      state.layer.appendChild(overlay);
-      return resolved;
-    }
+        return resolved;
+      }
+      state.layer.dataset.bgApp = resolved.app;
+      state.layer.dataset.bgVariant = resolved.variant || '';
 
-    if (resolved.type === 'image' && resolved.src) {
-      var staticImg = document.createElement('img');
-      staticImg.className = 'screen-bg-img';
-      staticImg.alt = '';
-      staticImg.src = ROOT + resolved.src;
-      state.layer.appendChild(staticImg);
-      return resolved;
-    }
+      var def = window.SSBApps.registry[resolved.app];
+      /* 背景应用参数两层合并：schema 默认 ∪ pages.json 顶层 apps[id]（无实例） */
+      var cfg = window.SSBApps.deepMerge(
+        window.SSBApps.appDefaults(def),
+        screenBG.globalApps[resolved.app] || {}
+      );
 
-    if (resolved.type === 'video' && resolved.src) {
-      var v = document.createElement('video');
-      v.className = 'screen-bg-img';
-      v.src = ROOT + resolved.src;
-      v.autoplay = true;
-      v.muted = true;
-      v.loop = true;
-      v.playsInline = true;
-      state.layer.appendChild(v);
-      var vCtl = { destroy: function () { try { v.pause(); } catch (e) {} } };
-      /* 视频同样按可见性暂停 */
-      observeActive(state.section, function (active) {
-        if (active) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
-        else v.pause();
-      }, vCtl);
-      state.ctl = vCtl;
-      return resolved;
-    }
-
-    return resolved;
-  }
-
-  /* IntersectionObserver：section 不可见时停止重活动画（粒子/视频） */
-  var bgIO = null;
-  function observeActive(section, onChange, ctl) {
-    if (!bgIO) {
-      bgIO = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.target.__bgActiveHandler) en.target.__bgActiveHandler(en.isIntersecting);
+      var ret;
+      try {
+        ret = def.render(state.layer, {
+          cfg: cfg, section: state.section, variant: resolved.variant || ''
         });
-      }, { threshold: 0.02 });
-    }
-    section.__bgActiveHandler = onChange;
-    bgIO.observe(section);
-    var oldDestroy = ctl.destroy;
-    ctl.destroy = function () {
-      bgIO.unobserve(section);
-      section.__bgActiveHandler = null;
-      oldDestroy && oldDestroy();
-    };
+      } catch (err) {
+        console.error('背景应用渲染失败：' + resolved.app, err);
+        state.layer.classList.add('screen-bg-empty');
+        return resolved;
+      }
+
+      function adopt(v) {
+        if (typeof v === 'function') state.ctl = { destroy: v };
+        if (v === false) state.layer.classList.add('screen-bg-empty');
+      }
+      if (ret && typeof ret.then === 'function') {
+        return ret.then(adopt).catch(function (err) {
+          console.error('背景应用渲染失败：' + resolved.app, err);
+          state.layer.classList.add('screen-bg-empty');
+        }).then(function () { return resolved; });
+      }
+      adopt(ret);
+      return resolved;
+    });
   }
 
-  /* 初始化当前页所有屏背景（apps.js 渲染完会触发事件） */
-  function initScreenBackgrounds() {
+  /* 壁纸明暗基调锁定：任何一层解析出 light/dark 基调即锁定整站主题
+     （选了亮只能亮、选了暗只能暗）；全部生效背景的基调都为「无」时
+     才允许自由切换。多层都有基调时最后渲染的一层定调（同页请保持
+     基调一致）。访客选择与作者配置一视同仁 */
+  function collectTone(resolved) {
+    if (resolved && (resolved.tone === 'light' || resolved.tone === 'dark')) {
+      screenBG.toneLock = resolved.tone;
+    }
+  }
+
+  /* 重渲染全部背景层并结算主题：有锁定→强制对应亮暗（覆盖任何手动
+     偏好，但不改写 ssb.theme，解锁后用户原偏好自动恢复）；
+     无锁定→按偏好模式恢复（auto=配置默认/系统，显式选择=用户值） */
+  function applyAllLayers() {
+    screenBG.toneLock = '';
+    return Promise.all(screenBG.list.map(function (state) {
+      clearLayer(state);
+      return applyState(state).then(collectTone);
+    })).then(function () {
+      applyResolvedTheme(screenBG.toneLock || resolveTheme(BlogUtils.config));
+    });
+  }
+
+  /* 初始化当前页所有屏背景（apps.js 渲染完触发事件，detail.globalApps
+     提供背景应用全局参数） */
+  function initScreenBackgrounds(detail) {
     readBgPref();
+    screenBG.globalApps = (detail && detail.globalApps) || {};
     var layers = Array.prototype.slice.call(document.querySelectorAll('.screen-bg'));
     screenBG.list = layers.map(function (layer) {
-      return { layer: layer, section: layer.closest('.page-screen'), ctl: null, resolved: null };
+      return {
+        layer: layer,
+        section: layer.closest('.page-screen'),
+        /* 作者背景在 init 时固化：访客切换只改 dataset（实际态），
+           clearPref 时靠这里回到作者配置，不能反过来读动态 dataset */
+        authorApp: layer.dataset.bgApp || '',
+        authorVariant: layer.dataset.bgVariant || '',
+        ctl: null, resolved: null
+      };
     });
-    screenBG.list.forEach(function (state) {
-      clearLayer(state);
-      var resolved = applyLayer(state);
-      /* 壁纸主题联动（仅访客主动选择的壁纸；普通底色不打扰手动主题选择）。
-         只在 auto 模式下生效，且只改「当前实际亮暗」不写偏好：
-         用户显式选了亮/暗色时壁纸无权覆盖，避免「切亮色还是暗色」 */
-      if (resolved.type === 'wallpaper' && resolved.followTone && resolved.tone) {
-        if (themeMode() === 'auto' &&
-            document.documentElement.dataset.theme !== resolved.tone) {
-          applyResolvedTheme(resolved.tone);
-        }
-      }
-    });
+    return applyAllLayers();
   }
 
-  /* 右键菜单：写访客偏好后重应用 */
+  /* 右键菜单：写访客偏好后重新应用全部层 */
   function setBgPref(pref) {
     writeBgPref(pref);
-    if (!screenBG.list.length) return;
-    screenBG.list.forEach(function (state) {
-      clearLayer(state);
-      var resolved = applyLayer(state);
-      if (resolved.type === 'wallpaper' && resolved.followTone && resolved.tone &&
-          themeMode() === 'auto' &&
-          document.documentElement.dataset.theme !== resolved.tone) {
-        applyResolvedTheme(resolved.tone);
-      }
-    });
+    if (!screenBG.list.length) return Promise.resolve();
+    return applyAllLayers();
   }
 
   window.SSBScreenBG = {
     init: initScreenBackgrounds,
-    loadWallpapers: loadWallpapers,
     getPref: function () { return screenBG.pref; },
     setPref: setBgPref,
-    /* 换一张随机壁纸：清掉记住的 file 后重新随机 */
-    shuffleWallpaper: function () {
-      var cur = screenBG.pref || { mode: 'wallpaper' };
-      cur.mode = 'wallpaper';
-      delete cur.file;
-      delete cur.tone;
-      cur.followTone = cur.followTone !== false;
-      setBgPref(cur);
+    /* 清除访客偏好：回到跟随作者配置 */
+    clearPref: function () { return setBgPref(null); },
+    /* 选中某背景应用的具体变体（壁纸/视频/颜色；粒子 variant 留空）。
+       主题恒跟随背景明暗基调（无开关） */
+    pick: function (app, variant, tone) {
+      return setBgPref({
+        mode: 'app', app: app, variant: variant || '',
+        tone: tone || ''
+      });
     },
-    setFollowTone: function (on) {
-      if (!screenBG.pref || screenBG.pref.mode !== 'wallpaper') return;
-      screenBG.pref.followTone = !!on;
-      writeBgPref(screenBG.pref);
-    },
-    wallpapers: function () { return screenBG.wallpapers; }
+    /* 随机换一个：在当前背景应用的变体列表里真随机（避开当前项）；
+       列表只有一项时原样重选 */
+    shuffle: function () {
+      var cur = screenBG.pref;
+      if (!cur || cur.mode !== 'app') return Promise.resolve();
+      var def = window.SSBApps.registry[cur.app];
+      if (!def || !def.variants) return Promise.resolve();
+      return def.variants().then(function (list) {
+        if (!list.length) return;
+        var pool = list.filter(function (v) { return v.value !== cur.variant; });
+        var choices = pool.length ? pool : list;
+        var hit = choices[Math.floor(Math.random() * choices.length)];
+        return setBgPref({
+          mode: 'app', app: def.id, variant: hit.value,
+          tone: hit.tone || ''
+        });
+      });
+    }
   };
 
   /* apps.js 渲染晚于本脚本，模块级监听即可接住 */
-  document.addEventListener('ssb-page-rendered', function () {
-    loadWallpapers().then(initScreenBackgrounds);
+  document.addEventListener('ssb-page-rendered', function (e) {
+    initScreenBackgrounds(e.detail || {});
   });
 
   /* ============================================================
-     Canvas 粒子动画
-     site-config.json 的 background 字段可调整：
-       background.count   粒子数量（默认 6）
-       background.speed   基础速度倍率（默认 0.4，值越大飘得越快）
-       background.size    [最小半径, 最大半径]（默认 [25, 115]）
-       background.color   颜色数组，或 'auto' 取主题色 + 补充色
-     每个粒子：大圆形、随机速度+加速度、淡入淡出生命周期、边界软反弹
-     ============================================================ */
-  /* 返回控制器 {destroy}：多屏各持有一个；section 不可见时暂停 RAF */
-  function initParticles(layer, bg, section) {
-    var canvas = document.createElement('canvas');
-    canvas.className = 'bg-canvas';
-    layer.appendChild(canvas);
-
-    var ctx = canvas.getContext('2d');
-    var shapes = [];
-
-    /* 从配置读取参数，全部给合理默认值防止 JSON 缺字段时报错 */
-    var count = Number(bg.count) || 6;
-    var speedMul = Number(bg.speed) || 0.4;
-    var sizeMin, sizeMax;
-    if (Array.isArray(bg.size) && bg.size.length === 2) {
-      sizeMin = Number(bg.size[0]) || 25;
-      sizeMax = Number(bg.size[1]) || 115;
-    } else {
-      sizeMin = 25; sizeMax = 115;
-    }
-
-    /* 颜色池：null 特殊值 = 运行时取主题色（好让粒子跟主题走） */
-    var palette = bg.color === 'auto'
-      ? [null, '#f9cc46', '#ef6a5f', '#7cc98e', '#e0e6f0']
-      : (Array.isArray(bg.color) ? bg.color : [null]);
-
-    function pickColor(i) {
-      var c = palette[i % palette.length];
-      if (c === null) return getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#1d6ff2';
-      return c;
-    }
-
-    function resize() {
-      var parent = canvas.parentElement;
-      canvas.width = parent.clientWidth;
-      canvas.height = parent.clientHeight;
-    }
-
-    /* 创建一个粒子：圆形、随机位置/速度/半径/寿命 */
-    function randomShape(index, W, H) {
-      return {
-        type: 'circle',
-        color: pickColor(index),
-        baseAlpha: 0.66 + Math.random() * 0.22,   /* 0.66~0.88，重叠自然融合 */
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: sizeMin + Math.random() * (sizeMax - sizeMin),
-        vx: (Math.random() - 0.5) * speedMul,
-        vy: (Math.random() - 0.5) * speedMul,
-        ax: 0, ay: 0,
-        life: 0,
-        maxLife: 800 + Math.random() * 1200,      /* 存活 40~100 秒 */
-        fadeIn: 120,
-        fadeOut: 160
-      };
-    }
-
-    function buildShapes() {
-      shapes = [];
-      var W = canvas.width;
-      var H = canvas.height;
-      for (var i = 0; i < count; i++) {
-        shapes.push(randomShape(i, W, H));
-        shapes[i].life = Math.random() * 200;  /* 初始随机年龄，避免同时出现 */
-      }
-    }
-
-    var rafId = null;
-    var active = true;      /* IntersectionObserver 按屏可见性控制 */
-
-    function onResize() {
-      resize();
-      buildShapes();
-    }
-
-    resize();
-    buildShapes();
-    window.addEventListener('resize', onResize);
-
-    function drawShape(s) {
-      ctx.save();
-      ctx.translate(s.x, s.y);
-
-      /* 淡入淡出 × 基础透明度：life < fadeIn 渐显，life > maxLife-fadeOut 渐隐 */
-      var alpha = s.baseAlpha;
-      if (s.life < s.fadeIn) alpha *= (s.life / s.fadeIn);
-      else if (s.life > s.maxLife - s.fadeOut) alpha *= (s.maxLife - s.life) / s.fadeOut;
-      alpha = Math.max(0, Math.min(s.baseAlpha, alpha));
-
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = s.color;
-      ctx.beginPath();
-      ctx.arc(0, 0, s.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      var W = canvas.width, H = canvas.height;
-
-      for (var i = 0; i < shapes.length; i++) {
-        var s = shapes[i];
-        s.life++;
-
-        /* 随机加速度：约 0.4% 概率改变方向，产生自然飘动感 */
-        if (Math.random() < 0.004) {
-          s.ax = (Math.random() - 0.5) * 0.025;
-          s.ay = (Math.random() - 0.5) * 0.025;
-        }
-        s.vx += s.ax;
-        s.vy += s.ay;
-        /* 速度上限（按 speedMul 缩放），防止加速度叠加后飞出屏幕 */
-        var sp = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
-        if (sp > speedMul * 0.75) {
-          s.vx *= (speedMul * 0.75) / sp;
-          s.vy *= (speedMul * 0.75) / sp;
-        }
-        /* 加速度衰减，让速度逐渐趋于稳定 */
-        s.ax *= 0.95;
-        s.ay *= 0.95;
-
-        s.x += s.vx;
-        s.y += s.vy;
-
-        /* 边界软反弹：出界 300px 再从另一侧进入，避免画面边缘粒子堆集 */
-        var pad = 300;
-        if (s.x < -pad) { s.x = W + pad; }
-        if (s.x > W + pad) { s.x = -pad; }
-        if (s.y < -pad) { s.y = H + pad; }
-        if (s.y > H + pad) { s.y = -pad; }
-
-        drawShape(s);
-
-        /* 生命周期结束：在当前粒子位置重新随机化（不是移除，保持数量稳定） */
-        if (s.life >= s.maxLife) {
-          shapes[i] = randomShape(i, W, H);
-        }
-      }
-      rafId = requestAnimationFrame(draw);
-    }
-
-    function start() {
-      if (rafId == null) { rafId = requestAnimationFrame(draw); }
-    }
-    function stop() {
-      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-    }
-
-    var ctl = {
-      destroy: function () {
-        stop();
-        window.removeEventListener('resize', onResize);
-      }
-    };
-
-    /* 屏不可见（滚动到其他屏）时暂停动画循环，可见时恢复 */
-    if (section && typeof IntersectionObserver !== 'undefined') {
-      observeActive(section, function (isActive) {
-        active = isActive;
-        if (isActive) start(); else stop();
-      }, ctl);
-    }
-
-    start();
-    return ctl;
-  }
-
-  /* ============================================================
      启动
-     DOMContentLoaded → fetch site-config.json → 渲染导航/背景/页脚
+     DOMContentLoaded → fetch site-config.json → 渲染导航/页脚
                       → dispatch('ssb-config-ready') → 各页面 initPage
      ============================================================ */
   document.addEventListener('DOMContentLoaded', function () {

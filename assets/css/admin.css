@@ -1378,6 +1378,63 @@ body {
   margin-top: 2px;
 }
 
+/* 壁纸 / 视频数据行（应用管理 → 数据 tab） */
+.media-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+/* 缩略图固定 120×72（15:9），原图按 cover 裁切预览 */
+.media-thumb {
+  width: 120px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #d8dce2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-thumb-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.media-empty { font-size: 12px; color: #6b7280; }
+
+/* 颜色壁纸数据行：色块实时预览（背景值内联在 style 上）；
+   none/空值显示斜纹，直观表示「无背景」 */
+.color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.color-swatch-none {
+  background: repeating-linear-gradient(45deg,
+    transparent 0 7px, rgba(107, 114, 128, .35) 7px 9px);
+}
+.media-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.media-fields .form-field { margin: 0; }
+.media-acts {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ---------- 窄屏适配 ---------- */
 @media (max-width: 860px) {
   .form-grid-3,
@@ -1394,6 +1451,18 @@ body {
   }
   .repeat-row input {
     flex-basis: 100%;
+  }
+
+  /* 壁纸/视频行：缩略图占满首行，操作钮横排 */
+  .media-row {
+    flex-wrap: wrap;
+  }
+  .media-thumb {
+    width: 100%;
+    height: 150px;
+  }
+  .media-acts {
+    flex-direction: row;
   }
 
   /* 页面列表：摘要换行，徽标隐藏，操作按钮收窄 */
@@ -1524,6 +1593,11 @@ body {
   color: #7c3aed;
   border-color: #a78bfa;
   background: rgba(167, 139, 250, .12);
+}
+.app-badge-bg {
+  color: #0e9488;
+  border-color: #5eead4;
+  background: rgba(94, 234, 212, .14);
 }
 .app-badge-error {
   color: #e5484d;
