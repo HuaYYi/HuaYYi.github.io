@@ -46,6 +46,7 @@ return window.probe(function (w) {
 | 汉堡按钮区域可点但三条线不可见 | 原生 button 外观下自定义子元素不绘制 | 按钮加 `-webkit-appearance:none`，内部 span 显式 `width:100%`（不依赖 flex 拉伸） |
 | 首页标语被背景花纹干扰 | 文字压在粒子/彩圆上缺对比 | 主题感知细描边：8 方向 1px、**0 模糊** text-shadow（用户要描边、不要发光模糊） |
 | 窄屏目录抽屉打开后关不掉 | 只有点目录链接才收起，缺遮罩关闭入口 | post.js 注入 `#toc-mask`（点击移除 toc-open），post.css 窄屏块内按 `body.toc-open #toc-mask` 淡入，z-index 94 低于抽屉 95 |
+| 遮罩/浮层看不见也点不到 | 旧 WebView（Chrome 87 前）不认 `inset` 简写，元素尺寸为 0 | 保留 inset 同时显式写 `top/right/bottom/left:0` 兜底；common.css 的 .drawer-mask 同理 |
 
 ## 排查新问题时的检查顺序
 

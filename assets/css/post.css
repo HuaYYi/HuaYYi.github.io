@@ -423,6 +423,9 @@ body.toc-hidden .post-layout {
   #toc-mask {
     position: fixed;
     inset: 0;
+    /* 旧 WebView（Chrome 87 前）不认 inset 简写，显式四边兜底，
+       否则遮罩尺寸为 0——看不见也点不到 */
+    top: 0; right: 0; bottom: 0; left: 0;
     background: rgba(0, 0, 0, .35);
     opacity: 0;
     pointer-events: none;

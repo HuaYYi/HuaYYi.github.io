@@ -855,6 +855,8 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 .drawer-mask {
   position: fixed;
   inset: 0;
+  /* 旧 WebView 不认 inset 简写（Chrome 87 前），显式四边兜底 */
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0,0,0,.35);
   opacity: 0;
   pointer-events: none;
