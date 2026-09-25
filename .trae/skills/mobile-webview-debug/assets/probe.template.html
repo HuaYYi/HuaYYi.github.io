@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>mobile probe</title></head>
+<body style="margin:0;background:#888">
+<!-- 用法：临时复制为仓库根目录 _probe.html（用完即删），
+     浏览器打开 _probe.html?p=<相对路径>&dark=1
+     例：_probe.html?p=posts/native-js-blog.html&dark=1
+     p 默认 index.html；dark=1 时把 prefers-color-scheme: dark
+     的 matches 桩为 true（必须用 Object.defineProperty，
+     直接给 matches 赋值会静默失败） -->
+<iframe id="f" style="width:375px;height:720px;border:0"></iframe>
+<script>
+(function () {
+  var qs = new URLSearchParams(location.search);
+  var page = qs.get('p') || 'index.html';
+  var dark = qs.get('dark') === '1';
+  var f = document.getElementById('f');
+
+  fetch(page).then(function (r) { return r.text(); })
+  .then(function (html) {
+    if (dark) {
+      var stub = '<script>(function(){' +
+        'var real=window.matchMedia.bind(window);' +
+        'window.matchMedia=function(q){var m=real(q);' +
+        'if(/prefers-color-scheme: dark/.test(q)){' +
+        'try{Object.defineProperty(m,"matches",{value:true,configurable:true});}' +
+        'catch(e){}}return m;};})();</' + 'script>';
+      html = html.replace('<head>', '<head>' + stub)
+                 .replace('<HEAD>', '<HEAD>' + stub);
+    }
+    var d = f.contentDocument;
+    d.open(); d.write(html); d.close();
+    /* 等 iframe 内目标节点出现；agent 也可继续等待自定义条件 */
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      var ready = f.contentDocument.readyState === 'complete';
+      if ((ready && tries > 5) || tries > 60) {
+        clearInterval(t);
+        window.__ready = true;
+      }
+    }, 200);
+  });
+
+  /* 给 agent 的便捷入口：在 iframe 窗口上下文执行函数，返回其结果。
+     用法（顶层 return，勿用 IIFE）：
+       return window.probe(function(w){ return w.getComputedStyle(
+         w.document.getElementById('hamburger')).display; });            */
+  window.probe = function (fn) {
+    return fn(f.contentWindow);
+  };
+})();
+</script>
+</body>
+</html>
