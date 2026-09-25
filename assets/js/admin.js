@@ -3542,9 +3542,9 @@
   /* 当前等待接收上传图片的壁纸行（点「上传壁纸」时记下，文件选择回调里用） */
   var wallpaperUploadRow = null;
 
-  /* 壁纸行：缩略图 + 名称/明暗/路径 + 上传原图。
-     __upload 是上传原图的临时 dataURL（提交时转 assets/wallpapers/ 独立图片并剥离，同图标机制）；
-     不用图标那套 32px 压缩——壁纸是全屏图，必须原图存储 */
+  /* 壁纸行：缩略图 + 名称/明暗/路径 + 上传。
+     __upload 是上传图的临时 dataURL（提交时转 assets/wallpapers/ 独立图片并剥离，同图标机制）；
+     上传时已压成 WebP（长边≤2560，GIF/SVG 直通）——壁纸是全屏图，不用图标那套 32px 压缩 */
   function wallpaperRowHTML(w) {
     w = w || {};
     var thumbSrc = w.__upload || (w.file ? '../' + w.file : '');
@@ -3563,7 +3563,7 @@
             '<option value="dark"' + (w.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
           '</select></label>' +
         '<label class="form-field"><span>文件路径</span>' +
-          '<input class="m-file" value="' + escapeHTML(w.file || '') + '" placeholder="assets/wallpapers/xxx.jpg"></label>' +
+          '<input class="m-file" value="' + escapeHTML(w.file || '') + '" placeholder="assets/wallpapers/xxx.webp"></label>' +
       '</div>' +
       '<div class="media-acts">' +
         '<button type="button" class="btn m-upload">上传壁纸</button>' +

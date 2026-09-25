@@ -1434,6 +1434,8 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+/* 右侧操作栏按钮等宽：上传（实框）与 ×（文字态）宽度一致，视觉不散 */
+.media-acts .btn { width: 100%; }
 
 /* ---------- 窄屏适配 ---------- */
 @media (max-width: 860px) {
@@ -1617,7 +1619,10 @@ body {
   word-break: break-all;
 }
 .app-manage-acts {
-  margin-top: 4px;
+  /* auto 把按钮组钉到卡片底部：同排卡片由 grid stretch 撑成同高，
+     描述行数不一也不会让按钮上下参差 */
+  margin-top: auto;
+  padding-top: 4px;
   display: flex;
   gap: 8px;
 }
