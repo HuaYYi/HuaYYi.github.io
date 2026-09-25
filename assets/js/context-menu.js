@@ -351,9 +351,15 @@
           label: opt.label,
           icon: U ? U.icon(opt.icon) : '',
           checked: current === opt.mode,
-          onClick: function () {
+          onClick: function (node) {
             U.setThemeMode(opt.mode);
-            return true;   /* 保持菜单打开，让勾选态即时反映 */
+            /* 立即重建子项，让 ✓ 移动到新模式：
+               旧实现只更新 LS/主题，勾选标记停在 fill 时的旧项，
+               会出现「勾在亮色、页面像暗色」的错觉。
+               node 自身在 fill 中被替换，但此刻已在其旧监听器内，安全 */
+            var subItem = node.closest('.ssb-ctx-sub');
+            if (subItem && subItem.__fill) subItem.__fill();
+            return true;   /* 保持菜单打开 */
           }
         });
       });
