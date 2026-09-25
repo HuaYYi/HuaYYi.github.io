@@ -999,6 +999,7 @@
       riBoxHTML(e) +
       '<input class="r-name" placeholder="名称，如：百度" value="' + escapeHTML(e.name) + '">' +
       '<input class="r-url" placeholder="搜索 URL 前缀，如 https://www.baidu.com/s?wd=" value="' + escapeHTML(e.url) + '">' +
+      '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
       '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
@@ -1023,6 +1024,7 @@
       riBoxHTML(l) +
       '<input class="r-name" placeholder="网站名称" value="' + escapeHTML(l.name) + '">' +
       '<input class="r-url" placeholder="网址，如 https://www.baidu.com/" value="' + escapeHTML(l.url) + '">' +
+      '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
       '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
@@ -3297,10 +3299,44 @@
     return name.trim().slice(0, 1) || '?';
   }
 
-  /* 网址变化后的实时匹配（由 input 事件防抖调用） */
-  function liveMatchRow(row) {
+  /* 网址变化后的实时匹配（由 input 事件防抖调用）。
+     force=true（「重试」按钮）：绕过手动锁定/同 host 跳过/仓库短路，
+     强制重新抓取；失败时恢复进入前的旧图标，不无故降级成字母 */
+  function liveMatchRow(row, force) {
     var host = itemHost({ url: (row.querySelector('.r-url') || {}).value });
     var st = liveIconMap.get(row);
+
+    if (force) {
+      if (!host) { toast('请先填写有效网址', true); return; }
+      var prev = st;   /* 旧图快照：行内匹配/手动上传的都记住，失败原样恢复 */
+      renderRiBox(row, { state: 'loading' });
+      matchSiteIcon(host).then(function (dataURL) {
+        if (dataURL) {
+          liveIconMap.set(row, { dataURL: dataURL, host: host, manual: false });
+          renderRiBox(row, { state: 'icon', dataURL: dataURL });
+          return;
+        }
+        /* 没获取到新图：行内旧图 → 仓库图 → 首字母，逐级恢复而非直接降级 */
+        var restore = function () { toast('未获取到新图标，已保留原有图标'); };
+        if (prev) {
+          liveIconMap.set(row, prev);
+          renderRiBox(row, { state: 'icon', dataURL: prev.dataURL });
+          restore();
+        } else {
+          loadRepoIconHosts().then(function (hostSet) {
+            if (hostSet && hostSet[host]) {
+              renderRiBox(row, { state: 'repo', host: host });
+            } else {
+              liveIconMap.delete(row);
+              renderRiBox(row, { state: 'letter', text: rowLetter(row) });
+            }
+            restore();
+          });
+        }
+      });
+      return;
+    }
+
     if (st && st.manual) return;                 /* 手动上传：锁定，不覆盖 */
     if (st && st.host === host && host) return;  /* 同 host 已匹配过 */
 
@@ -4675,6 +4711,15 @@
 
       var grpDel = e.target.closest('.group-del');
       if (grpDel) { grpDel.closest('.nav-group').remove(); return; }
+
+      /* 行内「重试」：强制重新抓取（网站换 logo 后可用）；转圈中不重复触发 */
+      var rBtn = e.target.closest('.icon-retry');
+      if (rBtn) {
+        var rRow = rBtn.closest('.repeat-row');
+        var rBox = rRow.querySelector('.ri-box');
+        if (rBox.dataset.state !== 'loading') liveMatchRow(rRow, true);
+        return;
+      }
 
       /* 行内「上传」：记住目标行，打开共用文件选择框（change 事件处理压缩） */
       var upBtn = e.target.closest('.icon-upload');

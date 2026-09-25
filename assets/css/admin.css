@@ -1284,7 +1284,9 @@ body {
   flex-shrink: 0;
 }
 
-/* 行首图标格（数据 tab：实时匹配/手动上传状态可视化） */
+/* 行首图标格（数据 tab：实时匹配/手动上传状态可视化）。
+   38px 外框只负责居中；图片/字母/空一律渲染成统一 30px 内块，
+   这样满版品牌色与透明底 logo 的视觉足迹一致 */
 .ri-box {
   width: 38px;
   height: 38px;
@@ -1300,13 +1302,24 @@ body {
   overflow: hidden;
 }
 .ri-box img {
-  width: 100%;
-  height: 100%;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   object-fit: contain;
+  background: #fff;   /* 透明底 logo 统一落在白块上 */
+}
+/* 字母/空占位同样是 30px 块，保证各行内容左边缘、大小对齐 */
+.ri-letter {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 /* letter 态必须与前台徽章同态（nav-card-badge / bs-engine-icon）：
    主色浅底 + 主色字；灰底仅留给空行/转圈等未决状态 */
-.ri-box[data-state="letter"] {
+.ri-box[data-state="letter"] .ri-letter {
   background: var(--primary-light);
   color: var(--primary);
   font-weight: 700;
@@ -1322,7 +1335,8 @@ body {
 @keyframes ri-spin {
   to { transform: rotate(360deg); }
 }
-.repeat-row .icon-upload {
+.repeat-row .icon-upload,
+.repeat-row .icon-retry {
   flex-shrink: 0;
   padding: 6px 9px;
   font-size: 12.5px;
