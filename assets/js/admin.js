@@ -2980,6 +2980,214 @@
     return dataFile ? 'json' : '';
   }
 
+  /* ============================================================
+     站点图标自动匹配（2026-09-25）
+     前台（nav / search）不再运行时直连外站 favicon（慢且不可控），
+     改在后台保存时为缺图标的条目匹配：
+       主源 icon.horse（256px），备源 yandex（16px），
+       拿到后统一用 canvas 压成 64×64 PNG，暂存条目 __icon（data:URL）。
+     两源对无图标/不存在域名都返回固定占位图，用 SHA-256 识别后放弃，
+     该条目前台固定显示首字母徽章；以后每次保存都会自动重试。
+     提交时（buildIconDataCommit）__icon 转 assets/icons/sites/<host>.png
+     独立文件上传并从 JSON 剥离，仓库里不留临时字段。
+     ============================================================ */
+  var ICON_FALLBACK_HASH = {
+    /* icon.horse 灰色「T」占位（256×256/1027B，2026-09-25 实测） */
+    horse: 'aab3aec07be04977cbd7c3eabb49786b37932fef4e930eb535d805834fa646c1',
+    /* yandex 空白占位（16×16/70B，2026-09-25 实测） */
+    yandex: '9681c0a0a13d8581f202bfaf62e53563ea6d0d6bd8e542b35b6d7c09b0e7b41b'
+  };
+  var ICON_SOURCES = [
+    { name: 'horse', build: function (host) { return 'https://icon.horse/icon/' + host; } },
+    { name: 'yandex', build: function (host) { return 'https://favicon.yandex.net/favicon/' + host; } }
+  ];
+
+  /* ArrayBuffer → SHA-256 十六进制（crypto.subtle，现代浏览器均支持） */
+  function sha256Hex(buf) {
+    return crypto.subtle.digest('SHA-256', buf).then(function (digest) {
+      return Array.prototype.map.call(new Uint8Array(digest), function (b) {
+        return ('00' + b.toString(16)).slice(-2);
+      }).join('');
+    });
+  }
+
+  /* 带超时的 fetch：外站服务不可控，8 秒不回就放弃、换下一个源 */
+  function fetchBytes(url) {
+    return new Promise(function (resolve, reject) {
+      var ctrl = new AbortController();
+      var timer = setTimeout(function () { ctrl.abort(); reject(new Error('timeout')); }, 8000);
+      fetch(url, { signal: ctrl.signal, cache: 'no-store' })
+        .then(function (r) {
+          if (!r.ok) { reject(new Error('HTTP ' + r.status)); return; }
+          r.arrayBuffer().then(function (buf) { clearTimeout(timer); resolve(buf); });
+        })
+        .catch(function (e) { clearTimeout(timer); reject(e); });
+    });
+  }
+
+  /* 图片字节 → 64×64 PNG data URL：
+     经 blob:URL 本地解码，字节已由本页持有，canvas 不会被跨域污染 */
+  function bytesToIconDataURL(buf) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(new Blob([buf]));
+      var im = new Image();
+      im.onload = function () {
+        var c = document.createElement('canvas');
+        c.width = 64; c.height = 64;
+        var g = c.getContext('2d');
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(im, 0, 0, 64, 64);
+        URL.revokeObjectURL(url);
+        try { resolve(c.toDataURL('image/png')); } catch (e) { reject(e); }
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode fail')); };
+      im.src = url;
+    });
+  }
+
+  /* 为单个域名匹配图标：按源顺序尝试，两源都失败/都是占位 → null（前台走首字母） */
+  function matchSiteIcon(host) {
+    var chain = Promise.resolve(null);
+    ICON_SOURCES.forEach(function (src) {
+      chain = chain.then(function (got) {
+        if (got) return got;
+        return fetchBytes(src.build(host))
+          .then(function (buf) {
+            return sha256Hex(buf).then(function (hex) {
+              if (hex === ICON_FALLBACK_HASH[src.name]) return null; /* 无图占位，放弃 */
+              return bytesToIconDataURL(buf);
+            });
+          })
+          .catch(function () { return null; });
+      });
+    });
+    return chain;
+  }
+
+  /* 从收集后的数据取全部条目：engines=条目数组；nav=各分类 links 摊平 */
+  function iconDataItems(dataOut, kind) {
+    if (kind === 'engines') return Array.isArray(dataOut) ? dataOut : [];
+    if (kind === 'nav') {
+      var items = [];
+      (Array.isArray(dataOut) ? dataOut : []).forEach(function (g) {
+        (g.links || []).forEach(function (l) { items.push(l); });
+      });
+      return items;
+    }
+    return [];
+  }
+
+  /* 条目 → hostname（非法/非 http(s) 返回 ''） */
+  function itemHost(item) {
+    try {
+      var u = new URL(String(item.url || '').trim());
+      return /^https?:$/.test(u.protocol) ? u.hostname : '';
+    } catch (e) { return ''; }
+  }
+
+  /* 仓库已有图标的域名集合（一次 Trees API，模块内缓存）：
+     避免每次保存都给老条目重发请求（icon.horse 免费 1000 次/月）。
+     加载失败 → null，调用方退化为「只匹配本次新增条目」，绝不盲抓 */
+  var repoIconHosts = 'init';   /* 'init'=未加载；null=加载失败；{}=结果集 */
+  function loadRepoIconHosts() {
+    if (repoIconHosts !== 'init') return Promise.resolve(repoIconHosts);
+    var rp = repoParts();
+    if (!(rp.owner && rp.name) || config.repo === 'your-name/your-repo') {
+      repoIconHosts = null;
+      return Promise.resolve(null);
+    }
+    return gh('/repos/' + rp.owner + '/' + rp.name +
+              '/git/trees/' + encodeURIComponent(config.branch) + '?recursive=1')
+      .then(function (data) {
+        var set = {};
+        (data.tree || []).forEach(function (n) {
+          var m = /^assets\/icons\/sites\/(.+)\.png$/.exec(n.path);
+          if (m) set[m[1]] = 1;
+        });
+        repoIconHosts = set;
+        return set;
+      })
+      .catch(function () { repoIconHosts = null; return null; });
+  }
+
+  /* 保存前自动匹配：仓库已有的跳过；仓库信息拿不到时只抓本次新增条目。
+     匹配到的 dataURL 写入 item.__icon；并发 3 路，避免一次性打满连接数 */
+  function autoMatchIcons(dataOut, kind, btn) {
+    var items = iconDataItems(dataOut, kind);
+    return loadRepoIconHosts().then(function (hostSet) {
+      /* 保存前的旧条目（按编辑器打开时的数据文件），仓库信息失败时用作兜底判定 */
+      var file = (adminRegistry[appEdit.id] || {}).dataFile;
+      var oldURLs = {};
+      iconDataItems(appsData.data[file] || [], kind)
+        .forEach(function (it) { oldURLs[it.url] = 1; });
+
+      var todo = [];
+      var seen = {};
+      items.forEach(function (it) {
+        if (it.__icon) return;        /* 上次保存已匹配待提交，不重复抓 */
+        var host = itemHost(it);
+        if (!host || seen[host]) return;
+        seen[host] = 1;
+        if (hostSet ? hostSet[host] : oldURLs[it.url]) return; /* 有图标：跳过；无仓库信息：老条目不重抓 */
+        todo.push({ host: host, item: it });
+      });
+      if (!todo.length) return;
+
+      var done = 0;
+      function runBatch(rest) {
+        return Promise.all(rest.slice(0, 3).map(function (job) {
+          return matchSiteIcon(job.host).then(function (dataURL) {
+            if (dataURL) job.item.__icon = dataURL;
+            done++;
+            btn.textContent = '匹配图标中 ' + done + '/' + todo.length + '…';
+          });
+        })).then(function () {
+          if (rest.length > 3) return runBatch(rest.slice(3));
+        });
+      }
+      btn.textContent = '匹配图标中 0/' + todo.length + '…';
+      return runBatch(todo);
+    });
+  }
+
+  /* 提交组装：engines/nav 数据里的临时 __icon（data:URL）转独立 PNG 文件，
+     JSON 剥离全部 __icon——仓库只保留干净数据，前台按 hostname 找本地图标。
+     删除登记（op=del）无需内容：文件删除由勾选行统一处理，返回空文件组 */
+  function buildIconDataCommit(path, op, text) {
+    var kind = appDataKind(path);
+    if (op === 'del' || text == null) return { kind: 'file', path: path, files: [] };
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { return { kind: 'file', path: path, files: [{ path: path, content: text }] }; }
+
+    var extraFiles = [];
+    var seenIcon = {};
+    iconDataItems(data, kind).forEach(function (it) {
+      if (typeof it.__icon === 'string' &&
+          it.__icon.indexOf('data:image/png;base64,') === 0) {
+        var host = itemHost(it);
+        /* 同域名只上传一次（多分类出现同一站时） */
+        if (host && !seenIcon[host]) {
+          seenIcon[host] = 1;
+          extraFiles.push({
+            path: 'assets/icons/sites/' + host + '.png',
+            content: it.__icon.slice('data:image/png;base64,'.length),
+            encoding: 'base64'
+          });
+        }
+      }
+      delete it.__icon;
+    });
+
+    var cleanJSON = JSON.stringify(data, null, 2) + '\n';
+    return {
+      kind: 'file',
+      path: path,
+      files: [{ path: path, content: cleanJSON }].concat(extraFiles)
+    };
+  }
+
   function renderAppTabs() {
     var d = editorDef();
     var fileInput = $('ae-datafile');
@@ -3256,6 +3464,25 @@
     var c = collectAppEditor();
     if (c.error) { showAppsMsg(c.error, true); return; }
 
+    /* engines/nav 保存前先自动匹配站点图标（异步，按钮显示进度），
+       匹配结果写在 c.dataOut 条目上，随后统一进保存流程 */
+    var preKind = appDataKind(c.dataFile);
+    if (preKind === 'engines' || preKind === 'nav') {
+      var preBtn = $('btn-ae-save');
+      preBtn.disabled = true;
+      showAppsMsg('');
+      autoMatchIcons(c.dataOut, preKind, preBtn).then(function () {
+        finishSaveAppEditor(c);
+      }).catch(function () {
+        preBtn.disabled = false;
+        preBtn.textContent = '保存';
+      });
+      return;
+    }
+    finishSaveAppEditor(c);
+  }
+
+  function finishSaveAppEditor(c) {
     var id = appEdit.id;
     var files = [];
 
@@ -4040,6 +4267,10 @@
           kind: 'pages', path: p,
           files: r2.files, extraDeletes: r2.deletes
         });
+      }
+      /* engines/nav：临时 __icon 转独立 PNG 文件随提交上传，JSON 剥离 __icon */
+      if (p === 'data/search-engines.json' || p === 'data/nav-links.json') {
+        return Promise.resolve(buildIconDataCommit(p, ops[p], pendingLocalText(p)));
       }
       var content = pendingLocalText(p);
       if (/\.json$/.test(p)) {

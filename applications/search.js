@@ -2,7 +2,9 @@
    SSB 应用：外站搜索框（search）
    数据文件：data/search-engines.json（{name, url 前缀} 数组）
    引擎选择存 localStorage（多实例共享同一选择）；
-   favicon 加载失败回退首字母。所有 DOM 操作按 box 作用域，支持多实例
+   图标用 assets/icons/sites/<域名>.png 本地副本，无本地图标/加载失败
+   固定回退首字母，前台不直连外站 favicon；后台保存时自动匹配。所有 DOM
+   操作按 box 作用域，支持多实例
    ============================================================ */
 (function () {
   /* 模块私有状态：引擎列表与当前选择在多个搜索实例间共享 */
@@ -216,31 +218,35 @@
     }
   });
 
-  /* 引擎图标：优先从 URL 自动推导 favicon，失败回退到首字母。
+  /* 引擎图标：条目带 __icon（本地已保存未提交的临时匹配）优先用临时 dataURL；
+     否则用仓库本地图标 assets/icons/sites/<hostname>.png（同域快）。
+     无 URL/非法协议/加载失败固定回退首字母——运行时不直连外站 favicon。
      img 用 DOM API 创建并以 addEventListener 挂 error（避免在 innerHTML
      字符串里拼接站点名，引号可破坏属性） */
-  function engineBadge(name, url) {
-    if (!url) return { type: 'text', text: (name || '?').slice(0, 1) };
+  function engineBadge(item) {
+    var name = item.name;
+    if (item.__icon) return { type: 'img', src: item.__icon };
+    if (!item.url) return { type: 'text', text: (name || '?').slice(0, 1) };
     try {
-      var u = new URL(url);
+      var u = new URL(item.url);
       if (!/^https?:$/.test(u.protocol)) return { type: 'text', text: (name || '?').slice(0, 1) };
-      return { type: 'img', src: u.protocol + '//' + u.hostname + '/favicon.ico' };
+      return { type: 'img', src: U.ROOT + 'assets/icons/sites/' + u.hostname + '.png' };
     } catch (e) {
       return { type: 'text', text: (name || '?').slice(0, 1) };
     }
   }
 
-  /* 把 favicon/首字母画进 .bs-engine-icon 容器（当前引擎按钮与菜单项共用） */
-  function paintBadge(iconEl, name, url) {
+  /* 把本地图标/首字母画进 .bs-engine-icon 容器（当前引擎按钮与菜单项共用） */
+  function paintBadge(iconEl, item) {
     iconEl.textContent = '';
-    var badge = engineBadge(name, url);
+    var badge = engineBadge(item);
     if (badge.type === 'img') {
       var img = document.createElement('img');
       img.src = badge.src;
       img.alt = '';
       img.style.cssText = 'width:100%;height:100%;object-fit:contain;border-radius:4px;';
       img.addEventListener('error', function () {
-        iconEl.textContent = (name || '?').slice(0, 1);
+        iconEl.textContent = (item.name || '?').slice(0, 1);
       });
       iconEl.appendChild(img);
     } else {
@@ -250,7 +256,7 @@
 
   function renderEngine(box) {
     var e = engines[currentEngine];
-    paintBadge(box.querySelector('.bs-engine-icon'), e.name, e.url);
+    paintBadge(box.querySelector('.bs-engine-icon'), e);
     box.querySelector('.bs-engine-name').textContent = e.name;
 
     box.querySelector('.bs-menu').innerHTML = engines.map(function (item, i) {
@@ -263,7 +269,7 @@
     /* 菜单项图标需逐个 DOM 绘制（含 img 失败回退） */
     box.querySelectorAll('.bs-menu-item').forEach(function (btn) {
       var item = engines[Number(btn.dataset.idx)];
-      paintBadge(btn.querySelector('.bs-engine-icon'), item.name, item.url);
+      paintBadge(btn.querySelector('.bs-engine-icon'), item);
     });
   }
 

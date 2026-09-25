@@ -1,6 +1,9 @@
 /* ============================================================
    SSB 应用：网址导航（nav）
    数据文件：data/nav-links.json（[{category, links:[{name,url}]}]）
+   图标：显示 assets/icons/sites/<域名>.png 仓库内预抓取副本（同域快、
+   不受目标站拖累）；无本地图标/加载失败固定显示首字母徽章，
+   前台不直连外站 favicon。后台保存时会自动为缺图标条目匹配。
    v3：每个实例独立的 tab/分页状态（zone.__navState），
    窗口缩放时遍历全部实例重算；触摸滑动、圆点、跨 tab 翻页保留。
    screen-scroll.js 通过 SSBApps.navGo(delta, zoneEl) 调用 wheel 钩子
@@ -435,11 +438,14 @@ html[data-theme="dark"] .nav-zone {
     var cardsEl = zone.querySelector('.nav-cards');
     cardsEl.innerHTML = pageLinks.map(function (l) {
       var href = safeUrl(l.url);
-      var iconSrc = '';
-      if (href) {
+      var iconSrc = l.__icon || '';   /* 后台已保存未提交的临时匹配（data:URL），提交后转本地文件 */
+      if (href && !iconSrc) {
         try {
           var u = new URL(href);
-          iconSrc = u.protocol + '//' + u.hostname + '/favicon.ico';
+          /* 仓库内预抓取副本（assets/icons/sites/，同域部署、统一 64×64），
+             速度不受对方站点快慢影响——学 hao.uisdc.com；
+             无本地图标的条目固定显示首字母徽章（img error 时兜底） */
+          iconSrc = U.ROOT + 'assets/icons/sites/' + u.hostname + '.png';
         } catch (e) {}
       }
       var tag = href ? 'a' : 'div';
@@ -448,7 +454,9 @@ html[data-theme="dark"] .nav-zone {
         : ' class="nav-card-disabled" title="链接协议不受支持（仅允许 http/https）"';
       return '<' + tag + attrs + '>' +
                '<span class="nav-card-icon-wrap">' +
-                 (iconSrc ? '<img class="nav-card-icon" src="' + iconSrc + '" alt="">' : '') +
+                 (iconSrc
+                   ? '<img class="nav-card-icon" src="' + U.escapeHTML(iconSrc) + '" alt="" decoding="async">'
+                   : '') +
                  '<span class="nav-card-badge"' + (iconSrc ? ' style="display:none"' : '') + '>' +
                    U.escapeHTML((l.name || '?').slice(0, 1)) +
                  '</span>' +
@@ -457,7 +465,7 @@ html[data-theme="dark"] .nav-zone {
              '</' + tag + '>';
     }).join('');
 
-    /* favicon 加载失败兜底：隐藏 img → 显示首字母 badge */
+    /* 图标加载失败（本地缺文件等）：固定回退首字母徽章，不直连外站 favicon */
     cardsEl.querySelectorAll('img.nav-card-icon').forEach(function (img) {
       img.addEventListener('error', function () {
         img.style.display = 'none';
