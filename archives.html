@@ -3,21 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HuaYYi Blog</title>
-  <meta name="description" content="HuaYYi 的个人博客：原生 HTML/CSS/JavaScript 实践、UI 设计与静态站点搭建记录。">
+  <title>归档 - HuaYYi Blog</title>
+  <meta name="description" content="HuaYYi Blog 全部文章归档，按年月分组并可按分类筛选。">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <!-- 统一容器页：屏/盒结构由 apps.js 按 pages.json 渲染进 #app-screens；
-       四套样式全引，任意板块（含归档/富文本）混排都能正常显示 -->
+  <!-- 统一容器页：屏/盒结构由 apps.js 按 pages.json 渲染进 #app-screens -->
   <link rel="stylesheet" href="assets/css/common.css">
   <link rel="stylesheet" href="assets/css/home.css">
   <link rel="stylesheet" href="assets/css/archives.css">
   <link rel="stylesheet" href="assets/css/post.css">
 </head>
 <body>
-  <!-- 公共头部：由 common.js 读取 site-config.json 注入（导航项来自 pages.json 的页面列表） -->
   <header id="site-header"></header>
 
-  <!-- 页面主体：apps.js 渲染 屏 → 盒子 → 板块；背景层在每个 .page-screen 内 -->
+  <!-- 页面主体：页面标题与板块（archive-list 等）均由 apps.js 渲染 -->
   <main id="app-screens"></main>
 
   <footer id="site-footer"></footer>

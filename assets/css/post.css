@@ -1,0 +1,486 @@
+/* ============================================================
+   post.css —— 文章页样式
+   重要：后台编辑器的「预览」通过 iframe 也引用本文件，
+   保证预览与线上文章排版完全一致。
+   ============================================================ */
+
+/* ---------- 整体两栏布局：正文 + 右侧目录 ---------- */
+.post-layout {
+  max-width: 1080px;
+  margin: 30px auto 0;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 44px;
+}
+
+.post-container {
+  width: 100%;
+  max-width: 740px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ---------- 封面 ---------- */
+.post-cover {
+  margin-bottom: 26px;
+}
+
+.post-cover img {
+  width: 100%;
+  max-height: 380px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  display: block;
+}
+
+/* ---------- 标题与元信息 ---------- */
+.post-title {
+  font-size: 30px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 14px;
+  color: var(--text-2);
+  padding-bottom: 22px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--border);
+}
+
+.post-meta .meta-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.post-meta .meta-avatar-text {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-meta .meta-author {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.post-meta .meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.post-meta .meta-item svg {
+  width: 15px;
+  height: 15px;
+}
+
+.post-meta .meta-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.post-meta .meta-category {
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* ============================================================
+   正文排版（.post-content 同时作用于后台预览）
+   ============================================================ */
+.post-content {
+  font-size: 16.5px;
+  line-height: 1.9;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.post-content p {
+  margin: 18px 0;
+}
+
+.post-content h2 {
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 40px 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: calc(var(--header-h) + 16px);
+}
+
+.post-content h3 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 32px 0 14px;
+}
+
+.post-content h4 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 26px 0 10px;
+}
+
+.post-content ul,
+.post-content ol {
+  margin: 18px 0;
+  padding-left: 26px;
+}
+
+.post-content ul {
+  list-style: disc;
+}
+
+.post-content ol {
+  list-style: decimal;
+}
+
+.post-content li {
+  margin: 8px 0;
+}
+
+.post-content li > ul,
+.post-content li > ol {
+  margin: 6px 0;
+}
+
+/* 行内代码：浅蓝胶囊 */
+.post-content code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: .88em;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+/* 代码块：浅灰底 */
+.post-content pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin: 20px 0;
+  overflow-x: auto;
+  line-height: 1.7;
+}
+
+.post-content pre code {
+  background: none;
+  color: var(--code-text);
+  padding: 0;
+  border-radius: 0;
+  font-size: 14px;
+}
+
+/* 代码高亮 token 配色（浅色系；暗色覆盖见文件末尾） */
+.post-content pre code .tok-com { color: #8a9199; font-style: italic; }
+.post-content pre code .tok-str { color: #0a7d43; }
+.post-content pre code .tok-kw  { color: #c4386b; font-weight: 600; }
+.post-content pre code .tok-num { color: #b26a00; }
+
+/* ============================================================
+   文末：上一篇 / 下一篇
+   ============================================================ */
+.post-pager {
+  display: flex;
+  gap: 14px;
+  margin: 48px 0 8px;
+}
+.pager-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.pager-side:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: translateY(-2px);
+}
+.pager-next { text-align: right; }
+.pager-label {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.pager-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pager-side:hover .pager-title { color: var(--primary); }
+.pager-disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+@media (max-width: 560px) {
+  .post-pager { flex-direction: column; }
+  .pager-next { text-align: left; }
+}
+
+/* 引用块：蓝色左边线 */
+.post-content blockquote {
+  margin: 20px 0;
+  padding: 4px 18px;
+  border-left: 4px solid var(--primary);
+  background: var(--bg-soft);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-2);
+}
+
+.post-content blockquote p {
+  margin: 10px 0;
+}
+
+.post-content a {
+  color: var(--primary);
+  border-bottom: 1px solid rgba(29, 111, 242, .3);
+  transition: border-color .2s;
+}
+
+.post-content a:hover {
+  border-bottom-color: var(--primary);
+}
+
+.post-content strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.post-content img {
+  border-radius: 8px;
+  display: block;
+  margin: 22px auto;
+}
+
+/* 配图 figure：图片 + 居中浅灰说明文字 */
+.post-content figure {
+  margin: 26px 0;
+}
+.post-content figure img {
+  margin: 0 auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.post-content figcaption {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.post-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 34px 0;
+}
+
+/* 表格 */
+.post-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 22px 0;
+  font-size: 15px;
+}
+
+.post-content th,
+.post-content td {
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  text-align: left;
+}
+
+.post-content th {
+  background: var(--bg-soft);
+  font-weight: 600;
+}
+
+.post-content tr:nth-child(even) td {
+  background: var(--table-stripe);
+}
+
+/* ============================================================
+   右侧文章目录（TOC）
+   ============================================================ */
+.post-toc {
+  position: sticky;
+  top: calc(var(--header-h) + 20px);
+  align-self: start;
+  max-height: calc(100vh - var(--header-h) - 50px);
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+/* 目录不加自动编号：作者可能在标题里自己写了序号（如「一、」「1.」），
+   自动编号会与之重复；纯文字层级 + 缩进即可 */
+.toc-list {
+  border-left: 2px solid var(--border);
+  padding: 2px 0;
+}
+
+.toc-list a {
+  display: block;
+  color: var(--text-2);
+  padding: 5px 12px;
+  margin-left: -2px;
+  border-left: 2px solid transparent;
+  transition: all .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toc-list a:hover {
+  color: var(--primary);
+}
+
+.toc-list a.active {
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+
+/* 三级目录：仅缩进一级，不编号 */
+.toc-list ol {
+  padding-left: 10px;
+}
+
+/* ============================================================
+   左侧悬浮工具：目录开关 / 回到顶部
+   ============================================================ */
+.post-tools {
+  position: fixed;
+  left: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 90;
+}
+
+.post-tools button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+}
+
+.post-tools button:hover {
+  color: var(--primary);
+  transform: scale(1.06);
+}
+
+.post-tools svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 回到顶部按钮：页面向下滚动后才显示 */
+#tool-top {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+
+#tool-top.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 宽屏手动收起右侧目录 */
+body.toc-hidden .post-toc {
+  display: none;
+}
+
+body.toc-hidden .post-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ============================================================
+   响应式：窄屏隐藏右侧栏，目录改抽屉
+   ============================================================ */
+@media (max-width: 1000px) {
+  .post-layout {
+    grid-template-columns: minmax(0, 1fr);
+    /* 左侧给悬浮工具留出专门的槽位，避免压住正文 */
+    padding-left: 72px;
+    padding-right: 16px;
+  }
+
+  .post-toc {
+    position: fixed;
+    top: var(--header-h);
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    max-height: none;
+    background: var(--surface);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-md);
+    transform: translateX(105%);
+    transition: transform .25s ease;
+    z-index: 95;
+    overflow-y: auto;
+  }
+
+  body.toc-open .post-toc {
+    transform: translateX(0);
+  }
+
+  .post-tools {
+    left: 14px;
+  }
+
+  .post-title {
+    font-size: 25px;
+  }
+}
+
+/* ============================================================
+   暗色主题下的代码高亮（深底配亮色 token）
+   ============================================================ */
+html[data-theme="dark"] .post-content pre code .tok-com { color: #7d8590; }
+html[data-theme="dark"] .post-content pre code .tok-str { color: #7ee787; }
+html[data-theme="dark"] .post-content pre code .tok-kw  { color: #ff7b9c; }
+html[data-theme="dark"] .post-content pre code .tok-num { color: #e3b341; }

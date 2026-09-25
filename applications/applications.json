@@ -1,0 +1,21 @@
+{
+  "_comment": {
+    "用途": "应用清单（注册表）：列出所有可在「页面管理」中挂载的应用。应用代码就在 applications/<id>.js，仓库文件即唯一基线（本地模式改坏了可在后台「恢复仓库代码」丢弃浏览器修改）",
+    "字段": {
+      "id": "应用唯一标识（小写字母/数字/-/_），与文件名一致；挂载实例 pages.json 的 screens[].boxes[].apps[].id 引用它",
+      "builtin": "true=内置应用（不可从清单删除，代码可编辑覆盖，本地模式可恢复仓库版）；省略或 false=自定义应用（可改可删）",
+      "dataFile": "应用专属数据文件名（可选）。内置的 quotes/search-engines/nav-links 有专用结构化编辑器；自定义应用填了则后台给 JSON 编辑器；数据读写自动走本地 localStorage / GitHub 提交通道"
+    },
+    "新增自定义应用": "后台「应用管理 → 新建应用」会自动生成模板并登记本清单（本地模式先存在浏览器里，到「提交管理」勾选提交后才真正进仓库）；也可以手工把 AI 写好的 applications/<id>.js 放进目录后在此登记",
+    "名称与参数": "应用名称、描述、hero（首屏居中类）、可调参数（configSchema）、CSS、render 全部在应用文件的 SSBApps.define({...}) 里声明，本清单只管路由"
+  },
+  "apps": [
+    { "id": "notice",       "builtin": true },
+    { "id": "quote",        "builtin": true, "dataFile": "quotes.json" },
+    { "id": "search",       "builtin": true, "dataFile": "search-engines.json" },
+    { "id": "nav",          "builtin": true, "dataFile": "nav-links.json" },
+    { "id": "posts",        "builtin": true },
+    { "id": "archive-list", "builtin": true },
+    { "id": "rich-content", "builtin": true }
+  ]
+}

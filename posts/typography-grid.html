@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>版式的底层逻辑：网格、留白与视觉层级 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "版式的底层逻辑：网格、留白与视觉层级",
+    "date": "2026-09-13",
+    "updated": "2026-09-13",
+    "category": "平面设计",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">版式的底层逻辑：网格、留白与视觉层级</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>一张海报、一页 PPT、一个网页，让人「觉得舒服」的原因往往说不出口，但拆开看无非三件事：元素有没有对齐（网格）、有没有呼吸感（留白）、眼睛有没有被带着走（层级）。这三件事都有可操作的方法。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%9E%81%E7%AE%80%E5%B9%B3%E9%9D%A2%E6%9E%84%E6%88%90%EF%BC%8C%E6%9D%82%E5%BF%97%E9%A3%8E%E6%A0%BC%E7%BD%91%E6%A0%BC%E6%8E%92%E7%89%88%EF%BC%8C%E6%A0%87%E9%A2%98%E6%AD%A3%E6%96%87%E7%95%99%E7%99%BD%E5%B1%82%E7%BA%A7%EF%BC%8C%E9%BB%91%E7%99%BD%E7%81%B0%E7%82%B9%E7%BC%80%E4%B8%80%E7%82%B9%E8%93%9D%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="杂志风格的网格排版构成" loading="lazy">
+          <figcaption>网格不可见，但它存在于每一条对齐线里——这就是版面「立得住」的秘密</figcaption>
+        </figure>
+
+        <h2>网格：对齐是信任感的来源</h2>
+        <p>网格是版面的隐形骨架。它不要求所有东西一样大，而是要求所有东西「落在格子上」。常用的做法有两种：</p>
+        <ul>
+          <li><strong>栏式网格</strong>：把版面切成若干竖栏，文字图片跨栏排布。杂志和网页布局基本都是这一路，CSS Grid 的 <code>repeat(6, 1fr)</code> 就是一个六栏网格；</li>
+          <li><strong>基准网格</strong>：定一个最小间距单位（比如 8px），所有尺寸都是它的倍数。间距 8、16、24、40，元素天然对齐，因为它们在同一套数轴上。</li>
+        </ul>
+        <p>对齐之所以重要，是因为人眼会主动找规律；有规律的排布读起来「省力」，这种省力感就是所谓的专业。</p>
+
+        <h2>留白：不是空着，是分组</h2>
+        <p>新手最舍不得的就是留白，总想把版面填满。但留白承担着最重要的信息功能——<strong>它告诉读者哪些内容是一伙的</strong>。格式塔心理学里的「亲密性原则」说的就是这个：相关的元素靠近，不相关的元素拉开。</p>
+        <p>一个立刻能用的检验方法：把版面做灰阶处理后眯眼看，如果标题和它下面的正文粘成一块黑，说明它们之间的间距小于正文段落之间的间距——层级反了。标题与正文的距离，应该小于正文段落之间的距离吗？不，应该更<strong>近</strong>才对（标题属于它的正文），而章节与章节之间要拉得更开。</p>
+
+        <h2>视觉层级：三个通道一起用</h2>
+        <p>引导视线的手段主要有三个通道，最好同时动用、方向一致：</p>
+        <ol>
+          <li><strong>字号</strong>：主标题和正文的对比要足够大，22px 对 16px 不如 34px 对 16px 清晰；</li>
+          <li><strong>字重</strong>：Regular 对 Bold，但一张版面上字重别超过两档，否则噪音上升；</li>
+          <li><strong>颜色</strong>：让重要元素唯一地拥有某个颜色（比如主题色只给交互元素），读者扫一眼就知道哪里能点。</li>
+        </ol>
+        <p>常见错误是「每样都强调」，结果所有东西在喊叫，等于没人喊叫。一张版面里的一级重点，通常不该超过一处。</p>
+
+        <h2>动手前的自查清单</h2>
+        <ul>
+          <li>所有边缘是否落在同一套网格上？有没有「差 2px」的对齐？</li>
+          <li>间距是否是基准单位（8 / 16 / 24 / 32…）的倍数？</li>
+          <li>眯眼测试：层级顺序和预期一致吗？</li>
+          <li>主题色是否只用在需要强调的地方？</li>
+          <li>删掉任何一个元素，信息会损失吗？不会就删。</li>
+        </ul>
+
+        <h2>字体搭配：两套字体足够</h2>
+        <p>新手常见动作是一张版面用四五种字体，结果像拼凑的剪贴报。可靠的搭配原则是<strong>对比但不打架</strong>：一款无衬线体承担正文（屏幕上易读），一款有特色的字体只给大标题。其余全用字重、字号制造变化。</p>
+        <p>中文排版还要注意字体栈的写法：中文字体名要带引号、英文字体写在中文字体前面（英文优先用英文字体渲染，中文回退到中文字体），否则数字和拉丁字母会被中文字体渲染得发虚：</p>
+        <pre><code>font-family: -apple-system, "Segoe UI",
+             "PingFang SC", "Microsoft YaHei", sans-serif;</code></pre>
+
+        <h2>中文排版的几个细节</h2>
+        <ul>
+          <li><strong>行长</strong>：正文每行 28–40 个汉字最舒服，太长读串行、太短频繁换行；</li>
+          <li><strong>行高</strong>：中文比英文需要更多行距，屏幕正文 1.7–1.9 是稳妥区间；</li>
+          <li><strong>标点挤压</strong>：连续的中文标点（如「，」「。」）视觉上会留下空洞，讲究的排版会做标点悬挂或半角挤压；</li>
+          <li><strong>中英文间距</strong>：中文与拉丁字母/数字之间留约四分之一字距（如「学习 CSS 3 天」），可以用自动化工具处理，也可以手动加空格。</li>
+        </ul>
+        <p>这些细节单独看都不起眼，但它们正是「随便排的」和「认真排过的」之间的差距——版式的专业感，从来都是细节总和。</p>
+
+        <blockquote>
+          <p>版式设计的本质不是「摆放好看」，而是降低读者获取信息的成本。网格降低对齐成本，留白降低分组成本，层级降低排序成本。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

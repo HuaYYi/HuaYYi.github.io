@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9f1fc"/>
+    </linearGradient>
+    <linearGradient id="waveA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dce9fb"/>
+      <stop offset="0.5" stop-color="#eef4fd"/>
+      <stop offset="1" stop-color="#d3e2f7"/>
+    </linearGradient>
+    <linearGradient id="waveB" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c9dcf5"/>
+      <stop offset="0.5" stop-color="#e3edfb"/>
+      <stop offset="1" stop-color="#c2d8f2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- 柔光光斑 -->
+  <ellipse cx="420" cy="240" rx="520" ry="260" fill="#ffffff" opacity="0.75"/>
+  <ellipse cx="1560" cy="880" rx="560" ry="300" fill="#dce9fb" opacity="0.55"/>
+
+  <!-- 远层波浪 -->
+  <path d="M-100 720 C300 600 620 820 980 700 C1340 580 1600 760 2020 660 L2020 1180 L-100 1180 Z"
+        fill="url(#waveA)" opacity="0.7"/>
+  <!-- 中层波浪 -->
+  <path d="M-100 830 C260 720 640 920 1000 820 C1360 720 1640 880 2020 800 L2020 1180 L-100 1180 Z"
+        fill="url(#waveB)" opacity="0.65"/>
+  <!-- 近层波浪 -->
+  <path d="M-100 950 C320 880 700 1020 1080 940 C1460 860 1720 980 2020 920 L2020 1180 L-100 1180 Z"
+        fill="#ffffff" opacity="0.85"/>
+</svg>

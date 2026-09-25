@@ -1,0 +1,11 @@
+{
+  "_comment": {
+    "使用说明": "背景图库清单。把图片放进 assets/wallpapers/ 后，在这里登记一条即可在后台「页面管理 → 屏幕背景」与访客右键菜单中选用",
+    "字段": "file=图片相对路径；name=显示名称；tone=light|dark 壁纸的明暗基调（访客选用该壁纸时可自动切换到对应主题，可在右键菜单中关闭「跟随壁纸明暗」）"
+  },
+  "wallpapers": [
+    { "file": "assets/wallpapers/dawn-mountains.svg", "name": "晨雾山峦", "tone": "light" },
+    { "file": "assets/wallpapers/light-waves.svg", "name": "柔光波浪", "tone": "light" },
+    { "file": "assets/wallpapers/night-stars.svg", "name": "星空夜幕", "tone": "dark" }
+  ]
+}

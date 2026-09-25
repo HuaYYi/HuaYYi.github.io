@@ -1,0 +1,105 @@
+[
+  {
+    "category": "搜索门户",
+    "links": [
+      { "name": "Google", "url": "https://www.google.com/" },
+      { "name": "百度", "url": "https://www.baidu.com/" },
+      { "name": "Bing", "url": "https://www.bing.com/" },
+      { "name": "知乎", "url": "https://www.zhihu.com/" },
+      { "name": "微博", "url": "https://weibo.com/" },
+      { "name": "维基百科", "url": "https://zh.wikipedia.org/" },
+      { "name": "少数派", "url": "https://sspai.com/" }
+    ]
+  },
+  {
+    "category": "设计灵感",
+    "links": [
+      { "name": "Dribbble", "url": "https://dribbble.com/" },
+      { "name": "Behance", "url": "https://www.behance.net/" },
+      { "name": "Awwwards", "url": "https://www.awwwards.com/" },
+      { "name": "站酷", "url": "https://www.zcool.com.cn/" },
+      { "name": "花瓣", "url": "https://huaban.com/" },
+      { "name": "UI中国", "url": "https://www.ui.cn/" },
+      { "name": "Mobbin", "url": "https://mobbin.com/" }
+    ]
+  },
+  {
+    "category": "设计素材",
+    "links": [
+      { "name": "Unsplash", "url": "https://unsplash.com/" },
+      { "name": "Pexels", "url": "https://www.pexels.com/zh-cn/" },
+      { "name": "Pixabay", "url": "https://pixabay.com/" },
+      { "name": "DaFont", "url": "https://www.dafont.com/" },
+      { "name": "IconFont", "url": "https://www.iconfont.cn/" },
+      { "name": "IconPark", "url": "https://iconpark.oceanengine.com/" },
+      { "name": "Noun Project", "url": "https://thenounproject.com/" },
+      { "name": "Hippopx", "url": "https://www.hippopx.com/zh" },
+      { "name": "爱给", "url": "https://www.aigei.com/" }
+    ]
+  },
+  {
+    "category": "设计工具",
+    "links": [
+      { "name": "Figma", "url": "https://www.figma.com/" },
+      { "name": "即时设计", "url": "https://js.design/" },
+      { "name": "Adobe Color", "url": "https://color.adobe.com/zh/" },
+      { "name": "uiGradients", "url": "https://uigradients.com/" },
+      { "name": "Coolors", "url": "https://coolors.co/" },
+      { "name": "PDF24", "url": "https://tools.pdf24.org/zh/" },
+      { "name": "PearOCR", "url": "https://pearocr.com/" },
+      { "name": "ProcessOn", "url": "https://www.processon.com/" },
+      { "name": "凡科快图", "url": "https://kt.fkw.com/" },
+      { "name": "FocoClipping", "url": "https://www.fococlipping.com/" }
+    ]
+  },
+  {
+    "category": "前端开发",
+    "links": [
+      { "name": "MDN", "url": "https://developer.mozilla.org/zh-CN/" },
+      { "name": "Can I Use", "url": "https://caniuse.com/" },
+      { "name": "GitHub", "url": "https://github.com/" },
+      { "name": "CodePen", "url": "https://codepen.io/" },
+      { "name": "掘金", "url": "https://juejin.cn/" },
+      { "name": "Stack Overflow", "url": "https://stackoverflow.com/" },
+      { "name": "菜鸟教程", "url": "https://www.runoob.com/" },
+      { "name": "Vant", "url": "https://youzan.github.io/vant/v3/#/zh-CN" },
+      { "name": "jsDelivr", "url": "https://www.jsdelivr.com/" },
+      { "name": "正则表达式测试", "url": "https://regex101.com/" }
+    ]
+  },
+  {
+    "category": "效率工具",
+    "links": [
+      { "name": "Notion", "url": "https://www.notion.so/" },
+      { "name": "flomo", "url": "https://flomoapp.com/" },
+      { "name": "Xmind", "url": "https://xmind.cn/" },
+      { "name": "TinyPNG", "url": "https://tinypng.com/" },
+      { "name": "RegExr", "url": "https://regexr.com/" },
+      { "name": "翻译", "url": "https://translate.google.com/" },
+      { "name": "PicX", "url": "https://picx.xpoet.cn/#/upload" }
+    ]
+  },
+  {
+    "category": "影音娱乐",
+    "links": [
+      { "name": "B站", "url": "https://www.bilibili.com/" },
+      { "name": "YouTube", "url": "https://www.youtube.com/" },
+      { "name": "腾讯视频", "url": "https://v.qq.com/" },
+      { "name": "爱奇艺", "url": "https://www.iqiyi.com/" },
+      { "name": "芒果TV", "url": "https://www.mgtv.com/" },
+      { "name": "豆瓣", "url": "https://www.douban.com/" },
+      { "name": "Learning Music", "url": "https://learningmusic.ableton.com/" }
+    ]
+  },
+  {
+    "category": "云服务",
+    "links": [
+      { "name": "阿里云", "url": "https://www.aliyun.com/" },
+      { "name": "腾讯云", "url": "https://cloud.tencent.com/" },
+      { "name": "GitHub Pages", "url": "https://pages.github.com/" },
+      { "name": "Cloudflare", "url": "https://www.cloudflare.com/" },
+      { "name": "Vercel", "url": "https://vercel.com/" },
+      { "name": "百度网盘", "url": "https://pan.baidu.com/" }
+    ]
+  }
+]

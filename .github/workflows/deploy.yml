@@ -1,0 +1,61 @@
+# ============================================================
+# GitHub Pages 自动构建部署
+# push 到 main 分支后：
+#   1. 安装构建依赖（html-minifier-terser / clean-css / terser）
+#   2. 执行 node scripts/build.mjs，把压缩后的站点输出到 dist/
+#   3. 将 dist/ 作为 Pages 产物发布
+# 首次使用需在仓库 Settings → Pages → Source 选择
+# 「GitHub Actions」。
+# ============================================================
+name: Deploy blog to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install build dependencies
+        run: npm install
+
+      - name: Build minified site
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

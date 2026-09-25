@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>写给工程师的 UI 设计速成：间距、圆角、配色都是参数系统 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "写给工程师的 UI 设计速成：间距、圆角、配色都是参数系统",
+    "date": "2026-09-08",
+    "updated": "2026-09-08",
+    "category": "UI 设计",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">写给工程师的 UI 设计速成：间距、圆角、配色都是参数系统</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>很多工程师觉得自己「没有美术细胞」，其实界面设计的核心部分一点都不玄学——它是一套参数系统：把连续的取值离散成有限的阶梯，然后在阶梯里做选择。这恰好是工程师最擅长的事。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%89%81%E5%B9%B3%E6%8F%92%E7%94%BB%EF%BC%8C%E6%A1%8C%E9%9D%A2%E4%B8%8A%E6%8E%92%E5%88%97%E7%9A%84%E9%97%B4%E8%B7%9D%E6%A0%87%E5%B0%BA%E5%9C%86%E8%A7%92%E5%8D%A1%E7%89%87%E4%B8%8E%E8%AE%BE%E8%AE%A1%E7%BB%84%E4%BB%B6%EF%BC%8C%E8%AE%BE%E8%AE%A1%E4%BB%A4%E7%89%8C%E6%A6%82%E5%BF%B5%EF%BC%8C%E6%B8%85%E7%88%BD%E8%93%9D%E7%99%BD%E9%85%8D%E8%89%B2%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="桌面上的标尺、圆角卡片与设计组件" loading="lazy">
+          <figcaption>设计系统的产出物不是「好看的图」，而是一组所有人都能复用的参数</figcaption>
+        </figure>
+
+        <h2>间距阶梯：告别「随手写个 13px」</h2>
+        <p>设计系统里的间距通常是一个 4 或 8 为底的阶梯：4、8、12、16、24、32、48。做界面时只允许从这个阶梯里取值。它的好处和代码里用枚举代替魔法数字一样——取值空间一小，「看起来不协调」的概率断崖式下降。</p>
+        <p>一个经验规则：<strong>外层间距大于内层间距</strong>。组件内部的留白（比如按钮的 padding）用小值，组件之间的距离用中值，板块之间的距离用大值。层级感有一半是间距给的。</p>
+
+        <h2>圆角与字号：同样是阶梯</h2>
+        <ul>
+          <li><strong>圆角</strong>：小元素配小圆角（输入框 8px），卡片配中圆角（12–16px），大面积容器配大圆角（20px+）。同一个界面里圆角别超过两三档；</li>
+          <li><strong>字号</strong>：常用的组合类似 12 / 13（辅助）、14 / 16（正文）、20 / 24（标题）、34+（大标题）。字号差至少 4px 以上才能拉开层级，2px 的差异肉眼基本无感。</li>
+        </ul>
+
+        <h2>配色：一个主色 + 一套灰阶 + 状态色</h2>
+        <p>不需要会配色，需要会「分配」颜色：</p>
+        <ol>
+          <li><strong>主色只给交互</strong>：按钮、链接、选中态。页面里主色出现得越少，单次出现就越醒目；</li>
+          <li><strong>灰阶承担 90% 的界面</strong>：文字用深灰而不是纯黑（#1f2328 之类），辅助文字中灰，边框浅灰，背景再浅一档；</li>
+          <li><strong>状态色语义化</strong>：成功、警告、错误各一个，只表达状态，不做装饰；</li>
+          <li><strong>对比度达标</strong>：正文与背景的对比度建议 ≥ 4.5:1（WCAG AA），灰色文字太浅是最常见的翻车点。</li>
+        </ol>
+
+        <h2>阴影即海拔</h2>
+        <p>把阴影理解为海拔：海拔越高的东西离用户越近。卡片浮在背景上（低海拔，小阴影），弹窗浮在卡片上（中海拔），对话框遮罩浮在一切之上（高海拔 + 遮罩）。同一个界面里，<strong>海拔体系一致</strong>比阴影好不好看重要得多——两张同海拔的卡片不该一个带影一个不带。</p>
+
+        <h2>工程师的天然优势：把设计写成 token</h2>
+        <p>这些阶梯完全可以用代码的方式固化下来：</p>
+        <pre><code>const DESIGN_TOKENS = {
+  spacing: [4, 8, 12, 16, 24, 32, 48],
+  radius:  { input: 8, card: 12, panel: 20 },
+  fontSize: { xs: 12, sm: 13, body: 14, h3: 20, h2: 24, h1: 34 }
+};</code></pre>
+        <p>本站的 CSS 变量就是这么做的：<code>--card-gap</code>、<code>--card-radius</code>、主题色派生比例，全部收敛成配置。当设计决策变成常量，「审美不稳定」这个问题就只剩下很少的几个变量需要调——而且每次只调一个。</p>
+
+        <h2>动效也是 token：时长与缓动</h2>
+        <p>界面里最容易显廉价的不是颜色，而是乱动的动画。两条硬规则：一是<strong>时长分档</strong>，小反馈（hover、按下）150–200ms，面板进出 200–300ms，超过 400ms 用户就会觉得「卡」；二是<strong>缓动用 ease-out 类</strong>（进场减速自然），少用线性和弹跳。全站只保留两三档时长、一两档缓动，写进 token：</p>
+        <pre><code>--dur-fast: .15s;   /* hover、颜色反馈 */
+--dur-mid:  .25s;   /* 抽屉、下拉 */
+--ease-out: cubic-bezier(.22, 1, .36, 1);</code></pre>
+        <p>另外，尊重系统的「减少动态效果」设置：<code>@media (prefers-reduced-motion: reduce)</code> 下把非必要动画关掉，这是一行 CSS 的无障碍加分项。</p>
+
+        <h2>别忘了四种状态，而不只是「默认态」</h2>
+        <p>工程师切图时最常只画一个默认态，但每个可交互元素都有至少四种状态：<strong>default / hover / active / disabled</strong>，输入框还要加 focus。漏掉 focus 态，键盘用户就找不到自己在哪；漏掉 disabled，用户就能在加载中连点三次。</p>
+        <p>比元素状态更容易被整体忽略的是<strong>页面状态</strong>：加载中（骨架屏或 loading）、空状态（列表为空时引导下一步）、错误态（说明原因 + 重试入口）。这三种状态在静态截图里不存在，所以没人画，但它们才是用户真实会遇到的界面。本站文章列表的「加载中…」「还没有文章」就是最简单的三态兜底。</p>
+
+        <h2>一条总原则：可点击的东西要像可点击的</h2>
+        <p>用户判断「这能不能点」靠的是形状线索：按钮要有填充或描边、链接要有颜色或下划线、可点区域至少 40×40px（移动端建议 44px，符合手指触控热区）。反过来，不可点的文字就不要做成按钮的样子。<strong>视觉承担的是「无需阅读说明就能操作」的职责</strong>，样式错配比样式难看更伤体验。</p>
+
+        <blockquote>
+          <p>设计感不是天赋，是约束。给取值加约束的人，看起来就像有设计感。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

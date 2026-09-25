@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一套主题色，派生全站配色：CSS 变量工程化实践 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "一套主题色，派生全站配色：CSS 变量工程化实践",
+    "date": "2026-09-20",
+    "updated": "2026-09-20",
+    "category": "前端",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">一套主题色，派生全站配色：CSS 变量工程化实践</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>这个博客的配置文件里只有一个颜色：<code>theme.primary</code>，比如 <code>#1d6ff2</code>。但页面上实际用到的颜色远不止一个——hover 要变深、标签底色要变浅、边框和阴影各有深浅。这些颜色全都是从那一个主题色「算」出来的。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%89%81%E5%B9%B3%E6%8F%92%E7%94%BB%EF%BC%8C%E4%B8%80%E4%B8%AA%E8%93%9D%E8%89%B2%E4%B8%BB%E8%89%B2%E5%9C%86%E8%A1%8D%E7%94%9F%E5%87%BA%E6%B7%B1%E6%B5%85%E6%9C%89%E5%BA%8F%E7%9A%84%E8%89%B2%E6%9D%BF%E7%BD%91%E6%A0%BC%EF%BC%8C%E8%AE%BE%E8%AE%A1%E7%B3%BB%E7%BB%9F%E9%85%8D%E8%89%B2%E6%A6%82%E5%BF%B5%EF%BC%8C%E5%B9%B2%E5%87%80%E8%83%8C%E6%99%AF%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="一个主色圆衍生出深浅色板网格" loading="lazy">
+          <figcaption>一个决策色，派生一整套语义色：按钮、标签、边框、阴影全都有据可查</figcaption>
+        </figure>
+
+        <h2>痛点：手写色值不可维护</h2>
+        <p>最常见的做法是设计稿给什么就写什么：hover 色写死一个 <code>#1660d1</code>，浅底写死一个 <code>#e8f1fe</code>。哪天想换主题色，就得全文件搜索替换，漏掉一处就出现「蓝不太一样的蓝」。</p>
+        <p>更好的思路是把颜色分成两类：<strong>决策</strong>（用户选的主色）和<strong>推导</strong>（由主色按固定规则算出的衍生色）。决策只存一份，推导交给程序。</p>
+
+        <h2>方案：运行时混色 + CSS 变量注入</h2>
+        <p>因为主色来自用户可改的 JSON 配置，运行时才知道值，所以没法在 SCSS 里预编译，只能在 JS 里现算。核心是一个混色函数：把主色和黑色或白色按比例做线性插值。</p>
+        <pre><code>// 与黑色混合 → hover 深色；与白色混合 → 浅底高亮
+function mix(hex, other, ratio) {
+  var c = parseHex(hex), o = parseHex(other);
+  var ch = c.map(function (v, i) {
+    return Math.round(v * (1 - ratio) + o[i] * ratio);
+  });
+  return '#' + ch.map(function (v) {
+    return ('0' + v.toString(16)).slice(-2);
+  }).join('');
+}
+
+var dark  = mix(primary, '#000000', 0.28); // 深 28%
+var light = mix(primary, '#ffffff', 0.92); // 浅 92%</code></pre>
+        <p>算完注入 <code>:root</code>：</p>
+        <pre><code>root.style.setProperty('--primary', primary);
+root.style.setProperty('--primary-dark', dark);
+root.style.setProperty('--primary-light', light);</code></pre>
+        <p>之后全站 CSS 只引用变量。换主题色 = 改一行 JSON，所有按钮、标签、圆点指示器、悬浮卡片同时换装。</p>
+
+        <h2>为什么比例是 0.28 和 0.92</h2>
+        <p>深色太浅会分不清是否 hover，太深会发黑发闷；浅底太实会盖过正文，太透会失去「高亮」的提示感。0.28 与 0.92 是在这两头之间试出来的平衡点——这类参数本身也值得抽成配置项（本站放在 <code>common.js</code> 的 INTERNAL 对象里），而不是散在逻辑中间。</p>
+
+        <h2>一个容易踩的坑：变量要「在定义处」读</h2>
+        <p>JS 需要拿到当前列数来计算导航分页时，如果去 <code>:root</code> 上读 <code>--nav-cols</code>，读到的是空——因为这个变量定义在 <code>.nav-cards</code> 上，还会被媒体查询按屏宽覆盖。<code>getComputedStyle</code> 遵循 CSS 变量的作用域规则：必须到「最终生效的那个定义元素」上去取。</p>
+        <pre><code>var cardEl = document.querySelector('.nav-cards');
+var cols = getComputedStyle(cardEl).getPropertyValue('--nav-cols');</code></pre>
+
+        <h2>给中性色也建立「语义层」</h2>
+        <p>新手组织变量时常按色值命名：<code>--gray-1</code> 到 <code>--gray-9</code>。写界面时却要不停回忆「边框是 gray-3 还是 gray-4」。更实用的做法是在色阶之上再包一层<strong>语义变量</strong>：</p>
+        <pre><code>:root {
+  /* 色阶（原材料） */
+  --gray-900: #1f2328;
+  --gray-500: #6b7280;
+  --gray-200: #eaecef;
+
+  /* 语义（界面实际引用） */
+  --text: var(--gray-900);
+  --text-2: var(--gray-500);
+  --border: var(--gray-200);
+}</code></pre>
+        <p>界面样式只允许引用语义层。将来做暗色模式时，不用逐个改组件，只要在 <code>[data-theme="dark"]</code> 下把语义变量重新映射到不同色阶——文字变浅、边框变深，一套组件自动适配。本站后来加暗色模式，靠的就是这层预留。</p>
+
+        <h2>实战迁移清单</h2>
+        <ol>
+          <li>先盘点：把全站颜色去重，你会发现 80% 的色值其实只对应不到十个语义；</li>
+          <li>定命名：按「用途」而不是「颜色」命名（<code>--danger</code> 而不是 <code>--red</code>）；</li>
+          <li>收敛入口：决策色写进 JSON 配置，衍生色在启动时注入，CSS 只引用变量；</li>
+          <li>留扩展点：中性色分色阶层和语义层，为主题切换留好位置；</li>
+          <li>最后替换：逐个文件消灭硬编码色值，替换完用搜索确认「没有漏网之鱼」。</li>
+        </ol>
+
+        <blockquote>
+          <p>配色系统和代码一样：一个入口（决策），多条通路（推导）。入口唯一，改起来才不慌。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

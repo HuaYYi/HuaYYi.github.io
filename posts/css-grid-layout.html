@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS Grid 实战：用网格做响应式卡片墙 - My Blog</title>
+  <script type="application/json" class="post-data">
+  {
+    "title": "CSS Grid 实战：用网格做响应式卡片墙",
+    "date": "2026-09-15",
+    "updated": "2026-09-15",
+    "category": "前端",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">CSS Grid 实战：用网格做响应式卡片墙</h1>
+      <div class="post-meta" id="post-meta"></div>
+
+      <article class="post-content">
+        <p>以前做响应式卡片墙，我习惯用 float 或 inline-block，然后写一堆 media query 来调整列数。CSS Grid 出现之后，这个思路彻底变了——你可以用几行代码实现一个「自动换列、自动等高、自动对齐」的网格，而且不需要 calc。</p>
+
+        <h2>最简网格：repeat + minmax</h2>
+        <p>Grid 的核心是 <code>grid-template-columns</code>。最常见的写法是 <code>repeat(auto-fill, minmax(200px, 1fr))</code>，意思是：</p>
+        <ul>
+          <li>每列最小 200px，最大 1fr（剩余空间均分）；</li>
+          <li>auto-fill 会自动填满整行，空间不够就换行；</li>
+          <li>不需要 media query，窗口缩小时自动减少列数。</li>
+        </ul>
+        <p>这种写法的精髓是「让浏览器自己决定列数」。你只需要告诉它「每列至少多宽」，剩下的交给算法。</p>
+
+        <h2>等高卡片：grid 的天然优势</h2>
+        <p>flexbox 做等高卡片很麻烦，要么用 <code>align-items: stretch</code>（会把内容也拉伸），要么用伪元素 hack。grid 不同：同一行的单元格默认等高，而且你可以给内容区单独设 <code>overflow</code>，让文字在内部滚动，卡片外形保持整齐。</p>
+        <pre><code>.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;  /* 卡片高度只由内容决定 */
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;        /* 卡片占满网格单元 */
+}</code></pre>
+
+        <h2>复杂布局：grid-template-areas</h2>
+        <p>如果你要做更复杂的布局，比如「左边大图、右边上下两张小图」的 masonry 效果，grid-template-areas 是最好的工具。它用 ASCII 图描述布局，直观到可以直接画出来：</p>
+        <pre><code>.gallery {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    "big  top"
+    "big  bot";
+}
+.gallery .big  { grid-area: big; }
+.gallery .top  { grid-area: top; }
+.gallery .bot  { grid-area: bot; }</code></pre>
+        <p>这种写法比 flexbox 的 order + 绝对定位要干净得多，而且响应式只需要改 grid-template-areas 就行。</p>
+
+        <h2>这个博客的导航网格</h2>
+        <p>网址导航的卡片墙用的是「固定列数 + 媒体查询」方案，而不是 auto-fill。原因是导航卡片需要<strong>按页翻页</strong>，每页必须是固定数量的卡片（6 列 × 2 行 = 12 张）。auto-fill 会让每页数量随屏幕宽度变化，翻页逻辑就崩了。</p>
+        <p>所以这里的方案是：CSS 用 <code>@media</code> 控制 <code>--nav-cols</code> 变量（大屏 6 列、中屏 4 列、小屏 3 列、手机 2 列），JS 读取这个变量算每页数量。列数变了，行数固定，每页数量自然跟着变。</p>
+
+        <h2>什么时候选 Grid，什么时候选 Flexbox</h2>
+        <ul>
+          <li><strong>Grid</strong>：二维布局（有行有列）、卡片墙、仪表盘、复杂网格；</li>
+          <li><strong>Flexbox</strong>：一维布局（只有行或只有列）、导航栏、按钮组、居中。</li>
+        </ul>
+        <p>两者不是互斥的——grid 的单元格里可以再放一个 flexbox 容器。比如导航卡片的外层是 grid（控制位置），内层是 flexbox（控制图标和文字的垂直居中）。</p>
+
+        <blockquote>
+          <p>Grid 不是 flexbox 的替代品，而是它的补充。理解「一维 vs 二维」，就能在正确的场景选对工具。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

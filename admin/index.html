@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>博客管理后台</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <!-- 复用前台变量与基础样式，保证前后台风格一致 -->
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+
+    <!-- ========== 左侧导航 ========== -->
+    <aside class="admin-sidebar">
+      <div class="admin-brand" id="admin-brand">管理后台</div>
+      <nav class="admin-nav">
+        <a href="javascript:;" class="nav-item active" data-view="posts">
+          <span class="nav-icon">📝</span>文章管理
+        </a>
+        <a href="javascript:;" class="nav-item" data-view="site">
+          <span class="nav-icon">🎛️</span>站点设置
+        </a>
+        <a href="javascript:;" class="nav-item" data-view="pages">
+          <span class="nav-icon">📄</span>页面管理
+        </a>
+        <a href="javascript:;" class="nav-item" data-view="apps">
+          <span class="nav-icon">🧩</span>应用管理
+        </a>
+        <a href="javascript:;" class="nav-item hidden" id="nav-commit" data-view="commit">
+          <span class="nav-icon">🚀</span>提交管理
+        </a>
+        <a href="javascript:;" class="nav-item" data-view="settings">
+          <span class="nav-icon">🔑</span>登录
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="../index.html" target="_blank" rel="noopener">↗ 访问前台</a>
+      </div>
+    </aside>
+
+    <!-- ========== 右侧主区域 ========== -->
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <div class="topbar-title" id="topbar-title">文章管理</div>
+        <div class="topbar-right">
+          <span class="ls-usage" id="ls-usage" title="本浏览器 localStorage 占用（站点数据）">
+            <span class="ls-usage-text" id="ls-usage-text">缓存 --</span>
+            <span class="ls-usage-bar"><span class="ls-usage-fill" id="ls-usage-fill"></span></span>
+          </span>
+          <span class="pat-status" id="pat-status"><i></i>未连接</span>
+        </div>
+      </header>
+
+      <div class="admin-content">
+
+        <!-- 视图一：文章列表 -->
+        <section class="view" id="view-posts">
+          <div class="action-row">
+            <button type="button" class="btn btn-primary" id="btn-new">＋ 新建文章</button>
+            <button type="button" class="btn" id="btn-reload">刷新列表</button>
+          </div>
+          <div class="card">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th class="col-title">标题</th>
+                  <th class="col-date">发布日期</th>
+                  <th class="col-cat">分类</th>
+                  <th class="col-ops">操作</th>
+                </tr>
+              </thead>
+              <tbody id="posts-tbody">
+                <tr><td colspan="4" class="table-loading">加载中…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 视图二：编辑器 -->
+        <section class="view hidden" id="view-editor">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-back">← 返回列表</button>
+            <div class="action-right">
+              <button type="button" class="btn" id="btn-preview">👁 预览</button>
+              <button type="button" class="btn btn-primary" id="btn-save">保存发布</button>
+            </div>
+          </div>
+
+          <div class="card editor-card">
+            <!-- 表单诱饵：防止浏览器 Autofill 匹配到业务字段（title、category 等会被误识别为"保存的信息"） -->
+            <!-- 隐藏但可被浏览器识别的 name/password，真正字段用 autocomplete="off" 进一步阻止 -->
+            <div style="position:absolute;left:-9999px;opacity:0;">
+              <input type="text" name="fake-username" tabindex="-1">
+              <input type="password" name="fake-password" tabindex="-1">
+            </div>
+
+            <!-- 文章元信息表单 -->
+            <div class="post-form">
+              <input type="text" class="input-title" id="f-title" placeholder="请输入文章标题" maxlength="120" autocomplete="off">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span>访问路径 slug（英文/数字/短横线）</span>
+                  <input type="text" id="f-slug" placeholder="my-first-post" autocomplete="off">
+                </label>
+                <label class="form-field">
+                  <span>发布日期</span>
+                  <input type="date" id="f-date" autocomplete="off">
+                </label>
+                <label class="form-field">
+                  <span>分类（可选）</span>
+                  <input type="text" id="f-category" placeholder="随笔" maxlength="20" autocomplete="off">
+                </label>
+              </div>
+              <label class="form-field">
+                <span>摘要</span>
+                <textarea id="f-summary" rows="2" maxlength="200" placeholder="一句话摘要，将显示在首页列表" autocomplete="off"></textarea>
+              </label>
+              <div class="form-field">
+                <span>封面图（可选）</span>
+                <div class="cover-row">
+                  <input type="text" id="f-cover-url" placeholder="可直接填图片地址，或点「上传」从本地选择" autocomplete="off">
+                  <button type="button" class="btn" id="btn-cover-upload">上传图片</button>
+                  <input type="file" id="cover-file" accept="image/*" hidden>
+                </div>
+                <div class="cover-preview" id="cover-preview"></div>
+              </div>
+            </div>
+
+            <!-- 富文本工具栏（按钮由 admin.js 渲染） -->
+            <div class="editor-toolbar" id="editor-toolbar"></div>
+
+            <!-- 编辑区 / 预览区（二选一显示，预览共用 post.css） -->
+            <div class="editor-body" id="editor-body" contenteditable="true"
+                 placeholder="开始写正文吧…支持直接 Ctrl+V 粘贴图片，保存文章时图片会自动上传"></div>
+            <iframe class="editor-preview hidden" id="editor-preview" title="文章预览"></iframe>
+            <input type="file" id="image-file" accept="image/*" hidden>
+          </div>
+        </section>
+
+        <!-- 视图三：站点设置（站点配置 + 首页应用数据，表单化维护） -->
+        <section class="view hidden" id="view-site">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-site-reload">重新加载</button>
+            <div class="action-right">
+              <button type="button" class="btn hidden" id="btn-site-reset">恢复仓库默认</button>
+              <button type="button" class="btn btn-primary" id="btn-site-save">保存设置</button>
+            </div>
+          </div>
+          <div class="form-msg" id="site-msg"></div>
+
+          <div class="card site-card" id="site-card">
+            <div class="site-loading">加载中…</div>
+          </div>
+        </section>
+
+        <!-- 视图四：页面管理列表（摘要行；点「编辑」进入 view-page-editor 维护屏/盒/板块） -->
+        <section class="view hidden" id="view-pages">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-pages-reload">重新加载</button>
+            <div class="action-right">
+              <button type="button" class="btn" id="btn-page-new">＋ 新建页面</button>
+              <button type="button" class="btn hidden" id="btn-pages-reset">恢复仓库默认</button>
+              <button type="button" class="btn btn-primary" id="btn-pages-save">保存页面</button>
+            </div>
+          </div>
+          <div class="form-msg" id="pages-msg"></div>
+
+          <!-- 响应式模板库：断点规则模板按层级分类（屏/盒/板块），供编辑页的
+               「响应式」下拉挂载；数据存 pages.json 顶层 responsive，随「保存页面」一起提交 -->
+          <div class="card site-card" id="resp-lib-card">
+            <section class="site-section">
+              <h2>响应式模板库</h2>
+              <p class="section-hint">把「浏览器宽度 ≤ X px 时改成什么」存成模板，按层级挂在屏、盒子、板块上复用；页面编辑处也可选「自定义规则」单独立配。模板改动后需点「保存页面」持久化。</p>
+              <div id="resp-lib-body"></div>
+            </section>
+          </div>
+
+          <!-- 新建页面（默认折叠）：本地模式生成动态页（page.html?slug=），
+               线上模式保存时同时生成 page-<slug>.html 静态文件 -->
+          <div class="card site-card hidden" id="page-new-card">
+            <section class="site-section">
+              <h2>新建页面</h2>
+              <p class="section-hint">页面标识即访问路径的一部分（如 about-us → page-about-us.html），创建后自动进入顶部导航，创建后可继续在编辑页中加屏、加盒子、挂板块。</p>
+              <div class="form-grid form-grid-3">
+                <label class="form-field">
+                  <span>页面标识 slug（英文/数字/短横线）</span>
+                  <input type="text" id="f-page-id" placeholder="links" maxlength="30" autocomplete="off">
+                </label>
+                <label class="form-field">
+                  <span>页面标题（导航文字 + 页面 h1）</span>
+                  <input type="text" id="f-page-title" placeholder="友情链接" maxlength="20" autocomplete="off">
+                </label>
+                <label class="form-field">
+                  <span>页面模板</span>
+                  <select id="f-page-template">
+                    <option value="list">列表页 list（归档式容器）</option>
+                    <option value="content">内容页 content（富文本容器）</option>
+                    <option value="landing">落地页 landing（全屏首屏容器）</option>
+                  </select>
+                </label>
+              </div>
+              <div class="action-row">
+                <button type="button" class="btn btn-primary" id="btn-page-create">创建并编辑</button>
+                <button type="button" class="btn" id="btn-page-cancel">取消</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- 页面摘要列表由 admin.js 渲染 -->
+          <div id="pages-list">
+            <div class="card site-card"><div class="site-loading">加载中…</div></div>
+          </div>
+        </section>
+
+        <!-- 视图四之二：单页编辑（屏 → 盒子 → 板块 三级结构，数据存 pages.json） -->
+        <section class="view hidden" id="view-page-editor">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-pe-back">← 返回页面列表</button>
+            <div class="action-right">
+              <button type="button" class="btn btn-primary" id="btn-pe-save">保存页面</button>
+            </div>
+          </div>
+          <div class="form-msg" id="pe-msg"></div>
+          <div id="pe-body"></div>
+        </section>
+
+        <!-- 视图五：应用管理（v3.5 列表化）
+             每个应用 = applications/<id>.js 里一次 SSBApps.define({...})，
+             代码/参数/数据全部可在后台编辑；仓库文件即唯一基线，本地改坏可恢复，
+             自定义应用可新建/删除；单个应用损坏不影响其他应用。 -->
+        <section class="view hidden" id="view-apps">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-apps-reload">重新加载</button>
+            <div class="action-right">
+              <button type="button" class="btn hidden" id="btn-apps-reset">恢复仓库默认</button>
+              <button type="button" class="btn btn-primary" id="btn-apps-new">＋ 新建应用</button>
+            </div>
+          </div>
+          <div class="form-msg" id="apps-msg"></div>
+
+          <!-- 列表态：应用卡片 -->
+          <div id="apps-list-wrap">
+            <p class="section-hint">
+              每个应用是一个独立代码文件，自带名称、样式、参数与渲染逻辑；可以自己写，也可以让 AI 写好后整段贴进「编辑代码」。
+              内置应用可直接修改，本地改坏了能一键恢复为仓库版本；自定义应用随时可删。单个应用出错只显示错误占位，不会拖垮整站。
+              本地模式的改动只存在本浏览器，测试满意后到「🚀 提交管理」勾选提交到仓库。
+            </p>
+            <div class="app-manage-grid" id="apps-grid">
+              <div class="site-loading">加载中…</div>
+            </div>
+          </div>
+
+          <!-- 编辑态：代码 / 参数 / 数据 三个标签页 -->
+          <div class="hidden" id="app-edit-wrap">
+            <div class="action-row">
+              <button type="button" class="btn" id="btn-ae-back">← 返回应用列表</button>
+              <div class="action-right">
+                <button type="button" class="btn btn-danger hidden" id="btn-ae-delete">删除应用</button>
+                <button type="button" class="btn hidden" id="btn-ae-restore">恢复仓库代码</button>
+                <button type="button" class="btn btn-primary" id="btn-ae-save">保存</button>
+              </div>
+            </div>
+            <div class="card site-card" id="app-edit-card">
+              <div class="ae-tabs" id="ae-tabs"></div>
+
+              <div class="ae-tabpane" data-pane="code">
+                <p class="section-hint" id="ae-code-hint">
+                  整段 JS 代码：以 <code>SSBApps.define({ id, name, desc, hero, configSchema, css, render })</code> 开头。
+                  保存时会做语法与注册校验，不通过则不会保存。编辑器内按 Tab 可缩进。
+                </p>
+                <textarea id="ae-code" class="code-editor" spellcheck="false" autocomplete="off"
+                          placeholder="SSBApps.define({...})"></textarea>
+              </div>
+
+              <div class="ae-tabpane hidden" data-pane="params">
+                <p class="section-hint">该应用声明的可调参数（来自代码里的 configSchema），保存在 pages.json 的 apps 节点，作为所有实例的全局默认；单个板块仍可在「页面管理」里覆盖。</p>
+                <div id="ae-params"></div>
+              </div>
+
+              <div class="ae-tabpane hidden" data-pane="data">
+                <div id="ae-data"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 视图六：提交管理（本地改动 → 选择性提交 GitHub） -->
+        <section class="view hidden" id="view-commit">
+          <div class="action-row">
+            <button type="button" class="btn" id="btn-cm-refresh">重新检测</button>
+            <div class="action-right">
+              <button type="button" class="btn btn-primary" id="btn-cm-submit">提交选中项到 GitHub</button>
+            </div>
+          </div>
+
+          <div class="card commit-intro">
+            <p class="section-hint">
+              本地模式下，文章、应用代码、页面与配置都先保存在<b>本浏览器</b>中，可以在前台反复测试；
+              确认可靠后，在这里勾选要提交的文件，一次提交到 GitHub 仓库（随后 Actions 自动构建，约 1~2 分钟上线）。
+              不勾选的改动继续留在本地，不受影响。
+            </p>
+            <div id="cm-repo-warn" class="commit-warn hidden">
+              当前 site-config.json 的 <code>repo</code> 还是占位值。请先到「站点设置」填写真实仓库（格式 owner/repo，
+              本地模式无需关闭 localMode），保存后回到本页。
+            </div>
+            <div class="form-grid form-grid-2 commit-meta-row">
+              <label class="form-field">
+                <span>GitHub PAT（仅本页面内存保留，需要仓库 Contents 写权限；生成方法见「登录」页）</span>
+                <input type="password" id="cm-pat" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off">
+              </label>
+              <label class="form-field">
+                <span>提交说明（留空自动生成）</span>
+                <input type="text" id="cm-message" maxlength="120" autocomplete="off"
+                       placeholder="例如：新增时钟应用 + 修改导航配置">
+              </label>
+            </div>
+          </div>
+
+          <div class="form-msg" id="cm-msg"></div>
+          <div id="cm-groups"><div class="site-loading">加载中…</div></div>
+        </section>
+
+        <!-- 视图七：登录（PAT 连接） -->
+        <section class="view hidden" id="view-settings">
+          <div class="card settings-card">
+            <div class="local-notice hidden" id="local-notice">
+              当前为 <b>本地模式</b>（site-config.json 中 <code>"localMode": true</code>）：
+              文章保存在本浏览器的 localStorage 中，仅本机可见，无需 PAT。
+              上线部署前请把 localMode 改回 <code>false</code>。
+            </div>
+            <h2>GitHub 连接</h2>
+            <p class="settings-hint">
+              仓库信息读取自 <code>site-config.json</code>。GitHub PAT 仅保存在当前页面内存中，
+              刷新或关闭页面后立即失效，不会写入浏览器存储或任何文件。
+            </p>
+            <div class="form-grid form-grid-2">
+              <label class="form-field">
+                <span>仓库（owner/repo）</span>
+                <input type="text" id="set-repo" readonly placeholder="自动读取 site-config.json">
+              </label>
+              <label class="form-field">
+                <span>分支</span>
+                <input type="text" id="set-branch" readonly>
+              </label>
+            </div>
+            <label class="form-field" id="pat-field">
+              <span>GitHub PAT（Fine-grained token，Contents 读写权限）</span>
+              <input type="password" id="set-pat" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off">
+            </label>
+            <div class="action-row settings-actions" id="pat-actions">
+              <button type="button" class="btn" id="btn-test">测试连接</button>
+              <button type="button" class="btn" id="btn-clear-pat">清除 PAT</button>
+            </div>
+            <div class="form-msg" id="set-msg"></div>
+
+            <div id="pat-help">
+              <h2 class="settings-second">如何生成 PAT</h2>
+              <ol class="hint-list">
+                <li>打开 GitHub → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → Generate new token</li>
+                <li>Repository access 选择本博客所在仓库</li>
+                <li>Repository permissions 中把 <b>Contents</b> 设置为 <b>Read and write</b>，其余权限不需要</li>
+                <li>过期时间按需选择（例如 7 天），生成后复制粘贴到上方输入框即可</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 全局轻提示 -->
+  <div class="toast" id="toast"></div>
+
+  <!-- 仅复用 apps.js 的纯数据逻辑（板块注册表 / v2→v3 迁移），不触发前台渲染 -->
+  <script src="../assets/js/apps.js"></script>
+  <script src="../assets/js/admin.js"></script>
+</body>
+</html>

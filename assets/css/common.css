@@ -1,0 +1,1066 @@
+/* ============================================================
+   common.css —— 全站公共样式
+   包含：设计变量、基础重置、顶部导航、站内搜索、页脚
+   开发版保留注释；线上版由构建脚本自动压缩
+   ============================================================ */
+
+/* ---------- 设计变量 ---------- */
+:root {
+  --primary: #1d6ff2;          /* 主色蓝（common.js 启动时会按配置覆盖） */
+  --primary-dark: #0f5cd0;
+  --primary-light: #eaf2ff;    /* 浅蓝底（行内代码、高亮） */
+  --text: #3c4047;             /* 主文字 */
+  --text-2: #6b7280;           /* 次要文字 */
+  --text-3: #9ca3af;           /* 弱化文字 */
+  --border: #eaecef;
+  --bg: #ffffff;
+  --bg-soft: #f6f7f9;
+  --surface: #ffffff;          /* 卡片/弹层/搜索框等「实心表面」 */
+  --surface-translucent: rgba(255, 255, 255, .85); /* 导航卡片半透明白 */
+  --header-bg: rgba(255, 255, 255, .92);
+  --code-bg: #f6f8fa;          /* 代码块底色 */
+  --code-border: #ebeef2;
+  --code-text: #2f3640;
+  --table-stripe: #fafbfc;     /* 表格斑马纹 */
+  --shadow-sm: 0 1px 4px rgba(31, 45, 68, .08);
+  --shadow-md: 0 4px 18px rgba(31, 45, 68, .12);
+  --radius: 10px;
+  --header-h: 64px;
+  --max-width: 1100px;
+}
+
+/* ---------- 暗色主题：只重新映射语义变量，组件样式一行不改 ----------
+   切换方式：common.js 在 <html> 上设置 data-theme="dark"，
+   选择跟随用户手动开关（localStorage）或系统偏好 */
+html[data-theme="dark"] {
+  --primary: #5b9bff;          /* 暗色下主色提亮（applyTheme 会按配置色重新派生） */
+  --primary-dark: #82b6ff;     /* hover：暗色下 hover 应更亮 */
+  --primary-light: rgba(91, 155, 255, .16);
+  --text: #e6e9ef;
+  --text-2: #9aa4b2;
+  --text-3: #68707f;
+  --border: #2a2f3a;
+  --bg: #0f1217;
+  --bg-soft: #171b22;
+  --surface: #181d26;
+  --surface-translucent: rgba(24, 29, 38, .82);
+  --header-bg: rgba(15, 18, 23, .9);
+  --code-bg: #141923;
+  --code-border: #262c38;
+  --code-text: #d8dee9;
+  --table-stripe: #1a2029;
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, .4);
+  --shadow-md: 0 4px 18px rgba(0, 0, 0, .5);
+}
+
+/* ---------- 基础重置 ---------- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* 屏间整屏停靠（下滑按钮 scrollIntoView / 锚点）时为固定头部让出高度，
+     下一屏顶部不会被 64px 高的固定 header 压住 */
+  scroll-padding-top: var(--header-h);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+  padding-top: var(--header-h);   /* 给固定头部让位 */
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;             /* 防止任何元素（下拉菜单/tab栏/粒子）溢出撑出水平滚动条 */
+  /* sticky footer：body 为纵向 flex 列，内容区 flex:1 吃满剩余高度，
+     内容不足一屏时页脚也能沉到视口底部；页脚仍是 body 直接子元素，居中方案不受影响 */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* 各页主内容区：有富余空间时向下生长把页脚顶到底部；
+   内容超过一屏时保持自然高度，不会被压缩 */
+body > section,
+body > main,
+body > .post-layout {
+  flex: 1 0 auto;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+/* ============================================================
+   屏级背景层（每个 .page-screen 自带一个 .screen-bg）
+   类型：default（透明）/ particles（canvas）/ image / video / wallpaper
+   壁纸层额外叠加 .screen-bg-overlay 半透明遮罩保证文字可读
+   ============================================================ */
+.screen-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bg-canvas,
+.screen-bg-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.screen-bg-img {
+  object-fit: cover;
+  object-position: center;
+}
+.screen-bg-wallpaper .screen-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 44, 64, .16);
+}
+html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
+  background: rgba(7, 11, 22, .46);
+}
+
+/* ============================================================
+   页面结构：屏 screen → 屏内盒组 inner → 盒子 box → 板块 app
+   ============================================================
+   - landing 模板的屏始终整屏；list/content 单屏保持普通文档流，
+     一旦加了多个屏同样整屏（由 apps.js 打 .is-full）。
+   - 多屏不做 scroll-snap 吸附：实测 proximity 会让相邻两屏的 snap area
+     连续覆盖，首屏区域内松手总被吸回第一屏顶，轻滑翻不到下一屏；
+     翻页改为「下滑」按钮整屏对齐（scrollIntoView + html scroll-padding
+     让开固定头部），滚轮保持完全自然滚动，长内容屏不受任何约束。
+   - 盒宽由 --box-w（px/%）控制，min() 夹取防窄屏横向溢出；
+     盒内边距/间距、应用外边距、屏内边距全部走 CSS 变量（默认值内联在
+     fallback 里），apps.js 编译的页面级 <style> 按屏/盒/实例写入变量，
+     响应式模板在 @media 中覆盖同名变量——浏览器原生求值，零 JS 开销。
+   - 布局方式为九宫格：screen-valign-*(justify-content) 定垂直、
+     screen-halign-*(align-items) 定水平；盒子 data-halign 可单独覆盖，
+     hAlign=auto 不写属性即跟随屏；app 的 data-align 控制自身水平对齐。
+   ============================================================ */
+#app-screens {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-screen {
+  position: relative;
+  width: 100%;
+}
+.page-screen.is-full {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  /* 不用 overflow:hidden：长内容屏要能自然撑高；
+     背景层 .screen-bg 自带 overflow:hidden 负责裁剪粒子 */
+}
+/* 第一屏要让掉固定头部高度（body padding-top 之外，section 自身满高时） */
+.page-screen.is-full:first-child {
+  min-height: calc(100vh - var(--header-h));
+  min-height: calc(100dvh - var(--header-h));
+}
+
+/* 屏内盒组：相对背景层抬起，is-full 时吃满整屏高度以便垂直分布。
+   内边距/间距全部变量化：--scr-padv/padh 为后台成对设置（上下/左右），
+   --scr-padt/padb/padl/padr 为模板语境默认值，前者优先 */
+.screen-inner {
+  position: relative;
+  z-index: 2;
+  flex: 1 0 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  padding-top: var(--scr-padv, var(--scr-padt, 40px));
+  padding-bottom: var(--scr-padv, var(--scr-padb, 40px));
+  padding-left: var(--scr-padh, var(--scr-padl, 24px));
+  padding-right: var(--scr-padh, var(--scr-padr, 24px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--scr-gap, 40px);
+}
+.page-screen.is-full .screen-inner {
+  flex: 1 1 auto;
+  /* 底部给下滑提示按钮预留位置，避免遮挡内容 */
+  --scr-padb: 96px;
+}
+/* 垂直居中时上下 padding 对称：96px 底部预留会把 justify-content:center
+   的视觉中心顶偏约 28px；居中内容块离底部按钮足够远，恢复常规 40px。
+   窄屏内容偏高，在 720px 媒体块中仍保留较大底部避让（特异性同为
+   四 class，媒体规则源码靠后，仅窄屏生效覆盖） */
+.page-screen.is-full .screen-inner.screen-valign-center {
+  --scr-padb: 40px;
+}
+
+/* 盒组九宫格分布：垂直（justify）×水平（align-items） */
+.screen-valign-start { justify-content: flex-start; }
+.screen-valign-center { justify-content: center; }
+.screen-valign-end { justify-content: flex-end; }
+.screen-halign-start { align-items: flex-start; }
+.screen-halign-center { align-items: center; }
+.screen-halign-end { align-items: flex-end; }
+
+/* 非整屏（list/content 单屏）的上下边距按模板微调 */
+.page-tpl-list .page-screen:not(.is-full) .screen-inner { --scr-padt: 44px; }
+.page-tpl-content .page-screen:not(.is-full) .screen-inner { --scr-padt: 24px; }
+
+/* 页面标题（非 landing 第一屏）：全宽独立于九宫格，避免被 align-items 收缩 */
+.page-heading { margin-top: 0; align-self: stretch; }
+
+/* 盒子：宽度 + 水平对齐 + 内边距/垂直间距（后台可调，默认 0/0/16px）；
+   min() 保证窄屏永远不溢出内边距区 */
+.page-box {
+  --box-w: 100%;
+  width: min(var(--box-w), 100%);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--box-padv, 0px);
+  padding-bottom: var(--box-padv, 0px);
+  padding-left: var(--box-padh, 0px);
+  padding-right: var(--box-padh, 0px);
+  gap: var(--box-gap, 16px);
+}
+.page-box[data-halign="left"] { align-self: flex-start; }
+.page-box[data-halign="center"] { align-self: center; }
+.page-box[data-halign="right"] { align-self: flex-end; }
+/* 无 data-halign（auto）= 跟随屏的 align-items，无需额外规则 */
+
+/* 板块实例在盒内的水平对齐：
+   text-align 管住文字类板块，子块 margin auto 管住搜索框/导航等组件；
+   margin 变量供后台设置板块外边距（上下/左右成对） */
+.app {
+  min-width: 0;
+  margin-top: var(--app-mv, 0px);
+  margin-bottom: var(--app-mv, 0px);
+  margin-left: var(--app-mh, 0px);
+  margin-right: var(--app-mh, 0px);
+}
+.app[data-align="left"] { text-align: left; }
+.app[data-align="center"] { text-align: center; }
+.app[data-align="right"] { text-align: right; }
+.app[data-align="left"] > * { margin-left: 0; margin-right: auto; }
+.app[data-align="center"] > * { margin-left: auto; margin-right: auto; }
+.app[data-align="right"] > * { margin-left: auto; margin-right: 0; }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 720px) {
+  .screen-inner { --scr-padl: 16px; --scr-padr: 16px; --scr-gap: 28px; }
+  .page-screen.is-full .screen-inner { --scr-padb: 84px; }
+  /* 居中屏窄屏仍多留底部空间，防止内容高时压住下滑按钮 */
+  .page-screen.is-full .screen-inner.screen-valign-center { --scr-padb: 84px; }
+}
+
+/* ============================================================
+   顶部导航
+   ============================================================ */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--header-h);
+  background: var(--header-bg);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  max-width: var(--max-width);
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* 左侧 logo + 站名 */
+.site-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.site-logo img {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.site-logo .logo-text {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  color: var(--text);
+}
+
+/* 右侧导航 + 搜索 */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.site-nav a {
+  font-size: 15px;
+  color: var(--text-2);
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color .2s;
+}
+
+.site-nav a:hover {
+  color: var(--primary);
+}
+
+.site-nav a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ---------- 站内搜索框 ---------- */
+.site-search {
+  position: relative;
+}
+
+.site-search input {
+  width: 180px;
+  height: 36px;
+  padding: 0 36px 0 16px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: var(--bg-soft);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: width .25s, background .25s, border-color .25s;
+}
+
+.site-search input::placeholder {
+  color: var(--text-3);
+}
+
+.site-search input:focus {
+  width: 240px;
+  background: var(--surface);
+  border-color: var(--primary);
+}
+
+.site-search .search-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-search input:focus ~ .search-btn {
+  color: var(--primary);
+}
+
+/* 搜索结果下拉面板 */
+.search-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 320px;
+  max-height: 380px;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  display: none;
+}
+
+.search-dropdown.show {
+  display: block;
+}
+
+.search-dropdown .dd-item {
+  display: block;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+
+.search-dropdown .dd-item:last-child {
+  border-bottom: none;
+}
+
+.search-dropdown .dd-item:hover {
+  background: var(--primary-light);
+}
+
+.search-dropdown .dd-title {
+  font-size: 14.5px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-dropdown .dd-item:hover .dd-title {
+  color: var(--primary);
+}
+
+.search-dropdown .dd-meta {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+.search-dropdown .dd-empty {
+  padding: 22px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+/* ============================================================
+   暗色模式开关（桌面头部圆形幽灵按钮 / 移动抽屉整行）
+   ============================================================ */
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s, color .2s;
+}
+.theme-toggle:hover {
+  background: var(--bg-soft);
+  color: var(--primary);
+}
+.theme-toggle svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* 移动端抽屉里的开关：整行按钮，文字在图标右侧 */
+.theme-toggle-mobile {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  padding: 12px 4px;
+  margin-bottom: 14px;
+  gap: 10px;
+  justify-content: flex-start;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--text);
+}
+.theme-toggle-mobile::after {
+  content: attr(title);   /* 复用按钮 title 显示「切换到暗色模式」文字 */
+  font-size: 15px;
+}
+
+/* ============================================================
+   页脚：收藏横条（浅色卡片）+ 版权行
+   （footer 本身的内边距由 JS 清零，内部两段各自控制间距）
+   ============================================================ */
+.site-footer {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-top: 80px;
+  margin-left: 0;
+  margin-right: 0;
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+
+/* 收藏横条：浅底卡片，左侧键帽提示、右侧社交图标 */
+.footer-band {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+.footer-band-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.footer-collect {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+.footer-collect kbd {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.footer-social {
+  display: flex;
+  gap: 10px;
+}
+.footer-social-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s, transform .15s;
+}
+.footer-social-btn:hover {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.footer-social-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 版权行：底部留足呼吸空间（旧版贴底边的问题） */
+.footer-copy {
+  margin: 0;
+  padding: 22px 24px 34px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ---------- 邮箱地址弹窗（页脚邮箱图标触发） ---------- */
+.mail-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.mail-modal {
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  padding: 22px;
+}
+.mail-modal h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  color: var(--text);
+}
+.mail-modal-hint {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+.mail-addr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mail-addr {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-copy {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: filter .15s;
+}
+.mail-copy:hover {
+  filter: brightness(1.08);
+}
+.mail-copy:disabled {
+  cursor: default;
+  filter: none;
+  opacity: .85;
+}
+.mail-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mail-modal-close:hover {
+  color: var(--text);
+  background: var(--bg-soft);
+}
+
+/* 窄屏：横条上下堆叠居中 */
+@media (max-width: 720px) {
+  .footer-band-inner {
+    flex-direction: column;
+    justify-content: center;
+  }
+  .footer-collect {
+    justify-content: center;
+  }
+}
+
+/* ---------- 本地模式角标（site-config.json 的 localMode: true 时显示）
+   absolute 定位到 body 左下角，脱离文档流，不影响 footer 居中 ---------- */
+.local-flag-float {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 999;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 13px;
+  border-radius: 999px;
+  opacity: .85;
+  pointer-events: none;   /* 角标本体是纯展示，不挡底下元素的点击 */
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 角标内的「清空缓存」按钮：角标本身 pointer-events:none，
+   按钮必须单独恢复 auto 才能点击（局部覆盖，不影响其他区域透点） */
+.local-flag-clear {
+  pointer-events: auto;
+  border: none;
+  background: rgba(255, 255, 255, .25);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  font-family: inherit;
+  padding: 4px 9px;
+  margin: -3px -6px -3px 0;   /* 抵消角标自身 padding，让按钮热区贴右缘 */
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: .9;
+  transition: background .2s, opacity .2s;
+}
+.local-flag-clear:hover {
+  background: rgba(255, 255, 255, .38);
+  opacity: 1;
+}
+
+/* ============================================================
+   汉堡按钮（桌面隐藏，窄屏显示）
+   ============================================================ */
+.hamburger {
+  display: none;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 8px;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.hamburger span {
+  display: block;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform .25s, opacity .25s;
+}
+.hamburger.active span:nth-child(1) {
+  transform: translateY(9px) rotate(45deg);
+}
+.hamburger.active span:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.active span:nth-child(3) {
+  transform: translateY(-9px) rotate(-45deg);
+}
+
+/* ============================================================
+   移动端抽屉（从顶部滑下）
+   ============================================================ */
+.mobile-drawer {
+  position: fixed;
+  top: var(--header-h, 60px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .3s ease, opacity .25s ease;
+  z-index: 999;
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+}
+.mobile-drawer.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0 4px;
+}
+.mobile-nav a {
+  padding: 14px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  transition: color .2s;
+}
+.mobile-nav a:hover { color: var(--primary); }
+.mobile-nav a.active { color: var(--primary); font-weight: 600; }
+
+.mobile-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 12px 0 16px;
+}
+.mobile-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 42px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg);
+}
+.mobile-search .search-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  background: var(--primary);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.mobile-search .search-btn svg { width: 14px; height: 14px; }
+.mobile-search .search-dropdown {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+}
+
+/* 遮罩层 */
+.drawer-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+  z-index: 998;
+}
+.drawer-mask.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================================================
+   窄屏适配
+   ============================================================ */
+@media (max-width: 720px) {
+  .header-inner {
+    padding: 0 14px;
+    gap: 10px;
+  }
+
+  .site-logo .logo-text {
+    font-size: 19px;
+  }
+
+  /* 桌面导航和搜索隐藏，汉堡显示 */
+  .header-right {
+    display: none !important;
+  }
+  .hamburger {
+    display: flex !important;
+  }
+}
+
+
+/* ============================================================
+   应用错误占位（apps.js 渲染调度收敛：代码损坏/未加载时显示，
+   让站长在页面上直接定位坏板，而不是面对一个静默空洞）
+   ============================================================ */
+.app-error {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px dashed var(--primary);
+  border-radius: 12px;
+  background: var(--primary-light);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.app-error b { color: var(--text); font-size: 14px; }
+.app-error code {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.app-error span { font-size: 12.5px; color: var(--text-3); }
+
+/* ============================================================
+   全站自定义右键菜单（context-menu.js）
+   ============================================================ */
+.ssb-ctx {
+  position: fixed;
+  z-index: 9999;
+  min-width: 192px;
+  max-width: 260px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 14px 44px rgba(15, 23, 42, .22);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.4;
+  -webkit-user-select: none;
+  user-select: none;
+  opacity: 0;
+  transform: scale(.96);
+  transform-origin: top left;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.ssb-ctx.ssb-ctx-anim {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ssb-ctx-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ssb-ctx-item:hover { background: var(--primary-light); }
+.ssb-ctx-item.disabled {
+  opacity: .45;
+  pointer-events: none;
+  cursor: default;
+}
+
+.ssb-ctx-ico {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+.ssb-ctx-ico svg { width: 16px; height: 16px; }
+.ssb-ctx-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ssb-ctx-check {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--primary);
+  font-weight: 700;
+}
+.ssb-ctx-arrow {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: 15px;
+  line-height: 1;
+}
+.ssb-ctx-sep {
+  height: 1px;
+  margin: 5px 9px;
+  background: var(--border);
+}
+
+/* 子菜单：桌面 hover 展开；触屏点击 .label 切 .open */
+.ssb-ctx-submenu {
+  display: none;
+  position: absolute;
+  left: calc(100% + 4px);
+  top: -7px;
+  min-width: 184px;
+  max-width: 240px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 14px 44px rgba(15, 23, 42, .22);
+  z-index: 1;
+}
+.ssb-ctx-sub.flip-x .ssb-ctx-submenu {
+  left: auto;
+  right: calc(100% + 4px);
+}
+.ssb-ctx-sub:hover > .ssb-ctx-submenu,
+.ssb-ctx-sub.open > .ssb-ctx-submenu {
+  display: block;
+}
+
+/* 复制反馈轻提示 */
+.ssb-ctx-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 10000;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: rgba(20, 26, 38, .92);
+  color: #fff;
+  font-size: 13.5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.ssb-ctx-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 触摸设备（或窄屏）右下角的菜单兜底按钮：
+   桌面宽屏不显示，右键即入口 */
+.ssb-tool-btn {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 900;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .18);
+  cursor: pointer;
+}
+.ssb-tool-btn:active { transform: scale(.94); }
+@media (pointer: coarse), (max-width: 560px) {
+  .ssb-tool-btn { display: flex; align-items: center; justify-content: center; }
+}

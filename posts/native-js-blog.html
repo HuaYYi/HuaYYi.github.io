@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>零框架博客是怎么炼成的：Self Static Blog 架构笔记 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "零框架博客是怎么炼成的：Self Static Blog 架构笔记",
+    "date": "2026-09-23",
+    "updated": "2026-09-23",
+    "category": "本站志",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">零框架博客是怎么炼成的：Self Static Blog 架构笔记</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>这个博客没有用 React、Vue，甚至没有用 jQuery——全部是原生 HTML、CSS、JavaScript。这不是为了怀旧，而是一次认真权衡后的选择。这篇文章把整个架构摊开讲讲：为什么这么做、怎么做的、踩过哪些坑。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%9E%81%E7%AE%80%E6%89%81%E5%B9%B3%E7%9F%A2%E9%87%8F%E6%8F%92%E7%94%BB%EF%BC%8C%E7%A7%AF%E6%9C%A8%E5%BC%8F%E6%90%AD%E5%BB%BA%E7%9A%84%E6%B5%8F%E8%A7%88%E5%99%A8%E7%BD%91%E7%AB%99%E6%9E%B6%E6%9E%84%EF%BC%8C%E8%93%9D%E8%89%B2%E8%B0%83%EF%BC%8C%E5%A4%A7%E9%87%8F%E7%95%99%E7%99%BD%EF%BC%8C%E7%A7%91%E6%8A%80%E5%8D%9A%E5%AE%A2%E5%A4%B4%E5%9B%BE%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="积木式搭建的浏览器网站架构插画" loading="lazy">
+          <figcaption>零依赖不等于零架构：只是把「框架替你做的事」换成了自己能完全掌控的约定</figcaption>
+        </figure>
+
+        <h2>为什么不用框架</h2>
+        <p>先看需求：一个首页（搜索框 + 网址导航 + 文章列表）、归档页、关于页、文章详情页，再加一个浏览器里跑的写作后台。页面总数不到 10 个，交互以「渲染 JSON 数据」为主，没有复杂的状态流转。</p>
+        <p>框架解决的核心问题是「状态与视图的同步」。当页面上有大量动态状态互相影响时，框架的声明式渲染能救命；但当你的状态少到可以用几个全局变量说清楚时，引入框架带来的是构建链、依赖升级、概念负担，收益却很小。对于部署在 GitHub Pages、希望「克隆下来就能跑」的静态博客，零依赖就是最大的功能。</p>
+
+        <h2>JSON 驱动：内容与代码分离</h2>
+        <p>整站的可变内容全部抽成了顶层 JSON 文件，改配置不需要碰任何 JS：</p>
+        <ul>
+          <li><code>site-config.json</code>：站名、主题色、背景动画参数、本地模式开关</li>
+          <li><code>search-engines.json</code>：首页大搜索框的引擎列表</li>
+          <li><code>nav-links.json</code>：网址导航的分类与链接</li>
+          <li><code>quotes.json</code>：随机名言</li>
+          <li><code>posts-list.json</code>：文章元数据（标题、日期、摘要、分类）</li>
+        </ul>
+        <p>页面脚本的启动流程是统一的：<code>common.js</code> 读完站点配置，注入主题色 CSS 变量、渲染头部页脚，然后广播一个 <code>ssb-config-ready</code> 事件，各页面自己的 <code>initPage(config)</code> 再接管剩下的渲染。这样每个页面脚本只关心自己的板块，公共逻辑收敛在一处。</p>
+
+        <h2>本地模式：没有后端的「后台」</h2>
+        <p>静态站没有数据库，写作后台怎么存数据？答案是双轨：</p>
+        <ul>
+          <li><strong>本地模式</strong>：文章元数据和正文直接存进浏览器的 localStorage（列表一个键、正文每个文件一个键），不访问网络、不需要任何令牌，适合离线写作和预览；</li>
+          <li><strong>线上模式</strong>：通过 GitHub Contents API 把文章以 commit 的形式提交到仓库，仓库再触发 Actions 构建发布。</li>
+        </ul>
+        <p>两种模式下，读文章的代码是同一套：<code>getPosts()</code> 先拉仓库里的 <code>posts-list.json</code>，本地模式再并入 localStorage 里的文章。对前台来说，文章来自 GitHub 还是来自浏览器，没有任何区别。</p>
+
+        <h2>构建与部署</h2>
+        <p>开发版代码带大量注释、保持可读；上线前由 <code>build.mjs</code> 压缩进 <code>dist/</code>：HTML 去注释折叠空白、CSS 用 clean-css、JS 用 terser。唯一原样拷贝的是 <code>posts/*.html</code>——文章正文不做任何转换，保证后台读到的和仓库里存的是同一份字节。</p>
+
+        <h2>踩过的坑</h2>
+        <ul>
+          <li>flex 子元素默认 <code>min-width: auto</code>，内容一宽就把容器撑爆，横向溢出——记得显式设 <code>min-width: 0</code>；</li>
+          <li><code>scrollIntoView({ inline: 'center' })</code> 在窄屏上会把整页拖走，手动算 <code>scrollLeft</code> 反而稳；</li>
+          <li>JS 要读 CSS 变量时，必须在「定义它的那个元素」上 <code>getComputedStyle</code>，读到 <code>:root</code> 头上可能是空。</li>
+        </ul>
+
+        <h2>没有框架，「组件化」怎么办</h2>
+        <p>原生 JS 里同样可以有组件思维，关键是划清边界。这个项目的做法是：<strong>一个板块 = 一个渲染函数 + 一份数据 + 一段作用域 CSS</strong>。比如网址导航：数据来自 <code>nav-links.json</code>，渲染只发生在 <code>#nav-zone</code> 内部，类名统一以 <code>nav-</code> 开头防冲突。函数执行完，DOM 已就位，事件委托挂在容器上，没有虚拟 DOM、没有 diff，但「数据变了就重渲染这块」的效果是一样的。</p>
+        <p>状态管理也极简：当前 tab、当前页码、当前搜索引擎，各用一个模块内变量保存，翻页函数是唯一的修改入口。状态少、入口唯一，就不需要库来帮你追踪变化。</p>
+
+        <h2>性能与体积：白手起家的红利</h2>
+        <p>整站前端 JS 加起来不到几十 KB，没有运行时、没有 hydration，HTML 下载完即可交互。首屏的主要「负担」反而是浏览器自己的渲染——这也是为什么动画坚持用 canvas + <code>requestAnimationFrame</code> 而不是狂堆 DOM：六个飘浮圆用一个全屏 canvas 统一绘制，比六个绝对定位的 div 各自触发合成层要省。</p>
+        <p>零依赖还带来一个隐性收益：<strong>供应链为零</strong>。没有 node_modules 就没有「每周一百个安全公告」，三年后打开仓库，<code>node scripts/serve.mjs</code> 依然能跑，不存在框架大版本升级导致的搁浅。</p>
+
+        <h2>什么时候我会反过来选框架</h2>
+        <p>如果未来出现这些信号，就该重新评估：页面需要大量实时联动状态（编辑器协同、仪表盘）；团队多人协作需要强约束的组件契约；需要 SSR/ISR 等服务端能力；或者交互复杂到手写渲染的代码量开始失控。技术选型是对当前约束的回答，不必从一而终。</p>
+
+        <blockquote>
+          <p>框架是工具不是信仰。需求简单时，原生技术栈 + 良好的代码组织，完全可以撑起一个干净、可维护、跑得飞快的站点。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

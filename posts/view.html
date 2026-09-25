@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文章 - HuaYYi Blog</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <!-- 本地模式专用查看页：本地文章没有真实 HTML 文件，
+       由本页从 localStorage 读取内容并注入到与普通文章完全相同的结构中 -->
+  <script type="application/json" class="post-data">
+  {}
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <!-- 公共头部：由 common.js 读取 site-config.json 注入 -->
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title"></h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content"></article>
+    </main>
+
+    <!-- 右侧文章目录：由 post.js 根据正文标题自动生成 -->
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <!-- 左侧悬浮工具按钮 -->
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script>
+  /* 注入必须发生在 DOMContentLoaded 之前（post.js 的 initPage 在那时读取元数据），
+     所以此脚本同步执行，不放 DOMContentLoaded 里 */
+  (function () {
+    var file = '';
+    try { file = new URLSearchParams(location.search).get('file') || ''; } catch (e) {}
+
+    var list = [];
+    try { list = JSON.parse(localStorage.getItem('ssb.local.posts') || '[]'); } catch (e) {}
+    var item = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].file === file) { item = list[i]; break; }
+    }
+    var content = file ? localStorage.getItem('ssb.local.content.' + file) : null;
+
+    if (!item || content === null) {
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelector('.post-title').textContent = '文章不存在';
+        document.querySelector('.post-content').innerHTML =
+          '<p>未找到本地文章（可能已被删除，或当前浏览器不是撰写文章的那台）。</p>' +
+          '<p><a href="../index.html">← 返回首页</a></p>';
+        var toc = document.getElementById('post-toc');
+        if (toc) toc.style.display = 'none';
+      });
+      return;
+    }
+
+    document.querySelector('.post-data').textContent = JSON.stringify({
+      title: item.title,
+      date: item.date,
+      updated: item.updated,
+      category: item.category,
+      cover: item.cover || ''
+    });
+    document.querySelector('.post-title').textContent = item.title || '';
+    document.title = item.title || '文章';
+    document.querySelector('.post-content').innerHTML = content;
+  })();
+  </script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

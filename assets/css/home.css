@@ -1,0 +1,65 @@
+/* ============================================================
+   home.css —— 全屏屏内组件样式（v3 后适用于任意模板的整屏）
+   ============================================================
+   v3 起「屏 / 盒子」的结构样式在 common.css（.page-screen 等），
+   本文件只保留非末屏的「下滑」提示按钮（.scroll-hint，apps.js 生成）。
+   各应用自带样式已随应用外置到 applications/<id>.js（define 的 css），
+   由 apps.js 加载器注入，不再散落在公共 CSS 中。
+   ============================================================ */
+
+/* ---------- 屏底提示按钮（非末屏：下滑到下一屏） ----------
+   绝对定位在当前 .page-screen 底部，轻微上下弹跳。
+   它是 <button>，先重置浏览器默认按钮外观 */
+.scroll-hint {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: var(--text-3);
+  -webkit-user-select: none;
+  user-select: none;
+  transition: color .2s;
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+.scroll-hint:hover { color: var(--primary); }
+@keyframes scrollBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-4px); }
+}
+
+.scroll-hint-text {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+/* 鼠标外形轮廓 */
+.scroll-mouse {
+  width: 22px;
+  height: 36px;
+  border: 2px solid currentColor;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+/* 鼠标滚轮：上下弹跳动画 */
+.scroll-wheel {
+  width: 3px;
+  height: 7px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: scrollWheel 1.4s ease-in-out infinite;
+}
+@keyframes scrollWheel {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(8px); opacity: .3; }
+}

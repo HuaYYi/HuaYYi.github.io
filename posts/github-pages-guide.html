@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Pages 静态站的生存指南 - My Blog</title>
+  <script type="application/json" class="post-data">
+  {
+    "title": "GitHub Pages 静态站的生存指南",
+    "date": "2026-09-21",
+    "updated": "2026-09-21",
+    "category": "前端",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">GitHub Pages 静态站的生存指南</h1>
+      <div class="post-meta" id="post-meta"></div>
+
+      <article class="post-content">
+        <p>把博客部署到 GitHub Pages 上，看起来是「零成本」的选择，但踩过坑之后才发现：免费的背后，是一套需要精心维护的工程。这篇文章总结我在 Pages 上跑静态站的经验，希望能帮你少走弯路。</p>
+
+        <h2>仓库即数据库</h2>
+        <p>静态站没有后端，数据存在哪里？答案很简单：<strong>仓库本身就是数据库</strong>。文章、配置、图片，全部以文件形式存在仓库里。写作后台的「保存」本质是调用 GitHub API 提交一个 commit；构建流程（GitHub Actions）再把仓库内容压缩、部署到 Pages。</p>
+        <p>这种模式的优点是<strong>版本控制天然存在</strong>——每一次修改都有 commit 记录，出问题可以随时回滚。缺点是<strong>每次保存都要等 CI 跑完</strong>（通常 30 秒到 1 分钟），不适合需要「即时发布」的场景。</p>
+
+        <h2>构建流程的取舍</h2>
+        <p>Pages 支持两种部署方式：直接从分支部署（Source 选 branch），或通过 GitHub Actions 部署。我选择了后者，原因是：</p>
+        <ul>
+          <li><strong>可以压缩代码</strong>：HTML/CSS/JS 在部署前经过 html-minifier-terser、clean-css、terser 处理，体积缩小 30%~50%。</li>
+          <li><strong>可以注入环境变量</strong>：比如把仓库地址、构建时间写进页面，方便调试。</li>
+          <li><strong>可以跑测试</strong>：构建失败直接中断部署，避免把坏代码推上线。</li>
+        </ul>
+        <p>但 Actions 也有坑：<strong>免费额度每月 2000 分钟</strong>，超了就要付费。所以构建脚本要尽量精简——我最终只保留了三步：装依赖、跑 build.mjs、上传 dist。</p>
+
+        <h2>本地模式：离线写作的退路</h2>
+        <p>Pages 的一个隐性限制是：<strong>没有网络就不能写作</strong>。为了解决这个问题，我给博客加了「本地模式」——文章和配置先存进浏览器的 localStorage，可以在本地预览效果，等有网了再一键提交到仓库。</p>
+        <p>本地模式的实现不复杂，但有几个细节需要注意：</p>
+        <ul>
+          <li>localStorage 有 5MB 限制，图片要压缩后再存；</li>
+          <li>键名要有统一前缀（我用 <code>ssb.local.</code>），避免和其他应用冲突；</li>
+          <li>提交时要合并本地数据和仓库数据，而不是简单覆盖。</li>
+        </ul>
+
+        <h2>性能优化：静态站的底线</h2>
+        <p>静态站的性能优势是「没有服务器延迟」，但劣势是「没有缓存控制」。Pages 的响应头由 GitHub 控制，你没法改 Cache-Control，所以资源文件名要自带版本号（比如 <code>app.v2.js</code>），改内容就换文件名，强制浏览器刷新。</p>
+        <p>另外，Pages 的 CDN 节点在国内访问速度一般，所以图片、字体等大文件尽量用国内 CDN 加速，或者干脆存到对象存储里。</p>
+
+        <h2>什么时候该离开 Pages</h2>
+        <p>如果你的博客出现以下情况，就该考虑迁移了：</p>
+        <ul>
+          <li>需要服务端渲染（SEO 要求高）；</li>
+          <li>需要用户登录、评论等动态功能；</li>
+          <li>构建时间超过 10 分钟（Actions 额度不够用）。</li>
+        </ul>
+        <p>但对于「个人博客 + 静态内容」这个场景，GitHub Pages 依然是性价比最高的选择——免费、稳定、自带 HTTPS，还能和 Git 工作流无缝集成。</p>
+
+        <blockquote>
+          <p>Pages 不是万能药，但它是「把博客跑起来」最快的路径。先跑起来，再慢慢优化。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

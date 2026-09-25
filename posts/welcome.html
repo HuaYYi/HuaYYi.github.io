@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>欢迎使用 Self Static Blog - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "欢迎使用 Self Static Blog",
+    "date": "2026-09-19",
+    "updated": "2026-09-19",
+    "category": "公告",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <!-- 公共头部：由 common.js 读取 site-config.json 注入 -->
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">欢迎使用 Self Static Blog</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>这是一篇示例文章，用来演示正文排版。访问 <code>/admin/</code> 登录后台后可以编辑或删除它。</p>
+
+        <h2>这是一个二级标题</h2>
+        <p>博客使用 <strong>原生 HTML / CSS / JavaScript</strong> 编写，没有任何前端框架。文章就是一个个独立的 HTML 文件，元数据保存在 <code>posts-list.json</code> 中。</p>
+
+        <h3>这是一个三级标题</h3>
+        <ul>
+          <li>文章通过后台的富文本编辑器撰写，输出的就是原生 HTML</li>
+          <li>在编辑器里直接 <strong>Ctrl + V</strong> 粘贴图片，保存文章时会自动上传</li>
+          <li>编辑器的预览样式与文章页共用同一份 CSS</li>
+        </ul>
+
+        <blockquote>
+          <p>静态页面没有数据库，每一次保存就是向 GitHub 仓库提交一次 commit。</p>
+        </blockquote>
+
+        <p>下面是一个代码块：</p>
+        <pre><code>// 文章按日期倒序展示
+posts.sort(function (a, b) {
+  return new Date(b.date) - new Date(a.date);
+});</code></pre>
+
+        <h2>开始使用</h2>
+        <ol>
+          <li>在 GitHub 仓库设置中开启 Pages（Source 选择 GitHub Actions）</li>
+          <li>生成一个仅含 Contents 读写权限的 Fine-grained PAT</li>
+          <li>访问 <code>/admin/</code>，粘贴 PAT 后即可写文章</li>
+        </ol>
+      </article>
+    </main>
+
+    <!-- 右侧文章目录：由 post.js 根据正文标题自动生成 -->
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <!-- 左侧悬浮工具按钮 -->
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

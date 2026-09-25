@@ -1,0 +1,64 @@
+{
+  "_comment": {
+    "使用说明": "本文件是整个博客的站点配置，修改后保存即可生效（本地模式下刷新页面看到）",
+    "字段详解": {
+      "siteName": "站点名称，显示在标题栏、页脚、后台品牌处",
+      "description": "站点简介（一句话），用于搜索引擎结果与社交分享卡片的 meta description，留空则不输出",
+      "logo": "站点 logo 图片地址（留空则显示纯文字站点名称）",
+      "author": "作者名字（about 页可用）",
+      "avatar": "作者头像地址（about 页可用）",
+      "repo": "GitHub 仓库地址，格式 owner/repo（如 huayyi/huayyi.github.io）。本地模式下可留默认占位值",
+      "branch": "分支名，默认 main",
+      "localMode": "是否开启本地模式。true=文章保存在浏览器 localStorage，不访问 GitHub、无需 PAT；false=走 GitHub 提交流程",
+      "theme.primary": "主题色十六进制（如 #1d6ff2），common.js 自动派生 hover 深色和浅底高亮色注入 :root",
+      "theme.dark": "暗色模式默认策略：auto=跟随系统外观 / light=默认亮色 / dark=默认暗色。用户在页面右上角的手动切换会记住选择并覆盖此默认值",
+      "background.type": "首页动态背景类型：particles=粒子动画 / image=静态图 / video=循环视频 / none=关闭",
+      "background.count": "粒子数量（particles 模式），默认 6，数量大吃性能",
+      "background.speed": "粒子速度倍率，默认 0.4，值越大飘得越快",
+      "background.size": "粒子大小范围 [最小半径, 最大半径]，默认 [25, 115]",
+      "background.color": "粒子颜色池。'auto'=自动取主题色+补充色；数组=['#xxx', '#yyy', ...]",
+      "background.src": "image/video 模式下的资源路径",
+      "heroNotice": "首页顶部公告条文字（纯文本），留空则隐藏",
+      "quoteSpeed": "首页名言打字机每个字的间隔毫秒数，默认 60，越小越快",
+      "navPanel": "首页网址导航的毛玻璃盒子：enable=false 关闭盒子恢复透明样式；opacity=白底透明度(0~1，越大越实)；blur=背景模糊半径px(毛玻璃强度)",
+      "social": "页脚收藏横条右侧的社交图标数组，每项 {name, icon, url}。icon=mail 时 url 直接填邮箱地址（mailto: 前缀可省略），访客点击弹窗展示地址供复制；icon=github 时为普通外链"
+    }
+  },
+
+  "siteName": "HuaYYi Blog",
+  "description": "HuaYYi 的个人博客：原生 HTML/CSS/JavaScript 实践、UI 设计与静态站点搭建记录。",
+  "startDate": "2021-08-27",
+  "logo": "",
+  "author": "博主",
+  "avatar": "",
+  "repo": "HuaYYi/HuaYYi.github.io",
+  "branch": "main",
+  "localMode": true,
+
+  "theme": {
+    "primary": "#1d6ff2",
+    "dark": "auto"
+  },
+
+  "background": {
+    "type": "particles",
+    "count": 6,
+    "speed": 0.4,
+    "color": "auto",
+    "size": [25, 115]
+  },
+
+  "heroNotice": "",
+  "quoteSpeed": 60,
+
+  "navPanel": {
+    "_comment": "网址导航毛玻璃盒子。enable=false 恢复无盒子透明样式；opacity 越大盒子越实(遮挡越强)；blur 越大背景越雾",
+    "enable": true,
+    "opacity": 0.4,
+    "blur": 8
+  },
+
+  "social": [
+    { "name": "邮箱", "icon": "mail", "url": "huayyi@foxmail.com" }
+  ]
+}

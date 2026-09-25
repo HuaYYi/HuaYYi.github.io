@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网址导航的取舍：如何整理一份实用导航清单 - My Blog</title>
+  <script type="application/json" class="post-data">
+  {
+    "title": "网址导航的取舍：如何整理一份实用导航清单",
+    "date": "2026-09-24",
+    "updated": "2026-09-24",
+    "category": "效率",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">网址导航的取舍：如何整理一份实用导航清单</h1>
+      <div class="post-meta" id="post-meta"></div>
+
+      <article class="post-content">
+        <p>大多数人的浏览器书签栏都是「垃圾场」：随手收藏、从不整理、越攒越多。这个博客的网址导航板块也一样——曾经堆了十几个分类、几百个链接，其中近半是重复的、失效的、或从未点开过的。这篇文章聊聊我整理导航清单的思路。</p>
+
+        <h2>先删掉一半</h2>
+        <p>整理导航的第一步不是「加」，而是「减」。我的原则是：</p>
+        <ul>
+          <li><strong>过去 3 个月没点过的</strong>，直接删。真正高频的网站根本不需要收藏，它们会出现在历史记录和自动补全里。</li>
+          <li><strong>功能重复的</strong>，留最好的一个。比如搜索留 Google + 百度，视频留 B 站 + YouTube，其余的删掉。</li>
+          <li><strong>失效或打不开的</strong>，毫不犹豫清掉。一个导航页里有 5 个死链，它的可信度就归零了。</li>
+        </ul>
+        <p>删完之后你会发现：留下的 20% 链接承载了 80% 的使用场景，导航页反而更清爽、更可用。</p>
+
+        <h2>分类不要太细</h2>
+        <p>分类越多，决策成本越高。我曾经有「前端框架」「前端工具」「前端资源」三个分类，结果每次找东西都要在三个 tab 之间来回试。后来合并成「前端开发」一个大类，内部按「文档 / 社区 / 工具」自然排序，反而更高效。</p>
+        <p>现在的分类控制在 8 个以内：搜索门户、设计灵感、设计素材、设计工具、前端开发、效率工具、影音娱乐、云服务。每个分类放 5~10 个链接，一页就能看完，不需要翻页。</p>
+
+        <h2>链接质量的三个标准</h2>
+        <ol>
+          <li><strong>HTTPS 优先</strong>：纯 HTTP 的网站要么换镜像，要么删掉，安全性不能妥协。</li>
+          <li><strong>可访问性</strong>：优先选国内能直连的，需要特殊网络才能打开的单独备注。</li>
+          <li><strong>长期价值</strong>：「工具类」和「文档类」网站的保质期远长于「资讯类」，优先收前者。</li>
+        </ol>
+
+        <h2>我的最终清单结构</h2>
+        <p>整理后的导航数据放在 <code>nav-links.json</code> 里，结构很简单：</p>
+        <pre><code>[
+  {
+    "category": "搜索门户",
+    "links": [
+      { "name": "Google", "url": "https://www.google.com/" },
+      { "name": "百度", "url": "https://www.baidu.com/" }
+    ]
+  }
+]</code></pre>
+        <p>改导航就是改这个文件，不需要碰任何代码。如果你也想整理自己的导航，不妨从「先删一半」开始——留下的才是真正值得收藏的。</p>
+
+        <blockquote>
+          <p>导航的价值不在于「全」，而在于「信得过」。每一个链接都是你亲自验证过、真正会用的。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

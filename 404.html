@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - 页面走丢了</title>
+  <meta name="description" content="页面不存在或已被移动">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Microsoft YaHei", sans-serif;
+      background: #f4f7fb;
+      color: #1f2937;
+      padding: 24px;
+    }
+    .nf-box { text-align: center; }
+    .nf-code {
+      font-size: 96px;
+      font-weight: 800;
+      line-height: 1;
+      color: #1d6ff2;
+      letter-spacing: 4px;
+    }
+    .nf-box h1 { margin: 18px 0 10px; font-size: 22px; }
+    .nf-box p { color: #6b7280; font-size: 15px; margin-bottom: 28px; }
+    .nf-home {
+      display: inline-block;
+      padding: 11px 26px;
+      background: #1d6ff2;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: background .2s;
+    }
+    .nf-home:hover { background: #155ad1; }
+  </style>
+</head>
+<body>
+  <div class="nf-box">
+    <div class="nf-code">404</div>
+    <h1>页面走丢了</h1>
+    <p>你访问的页面不存在，或已被移动。</p>
+    <a class="nf-home" id="nf-home" href="index.html">← 返回首页</a>
+  </div>
+  <script>
+    /* 404 可能在任意深度路径被提供：
+       单级错误路径（如 /repo/typo）相对 index.html 已能回到首页；
+       多级路径（如 /repo/typo/bar）退回到第一路径段（项目站点根）兜底 */
+    (function () {
+      var segs = location.pathname.split('/');
+      if (segs.length > 3) {
+        document.getElementById('nf-home').href = '/' + segs[1] + '/index.html';
+      }
+    })();
+  </script>
+</body>
+</html>

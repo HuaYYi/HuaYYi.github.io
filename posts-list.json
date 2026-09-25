@@ -1,0 +1,90 @@
+[
+  {
+    "title": "网址导航的取舍：如何整理一份实用导航清单",
+    "date": "2026-09-24",
+    "updated": "2026-09-24",
+    "file": "nav-cleanup.html",
+    "summary": "先删掉一半，再谈整理。导航的价值不在于「全」，而在于「信得过」——每一个链接都是你亲自验证过、真正会用的。",
+    "category": "效率"
+  },
+  {
+    "title": "零框架博客是怎么炼成的：Self Static Blog 架构笔记",
+    "date": "2026-09-23",
+    "updated": "2026-09-23",
+    "file": "native-js-blog.html",
+    "summary": "这个博客为什么不用任何框架？从 JSON 驱动、双轨存储到构建部署，把整站架构摊开讲一遍，附上踩过的三个经典坑。",
+    "category": "本站志"
+  },
+  {
+    "title": "GitHub Pages 静态站的生存指南",
+    "date": "2026-09-21",
+    "updated": "2026-09-21",
+    "file": "github-pages-guide.html",
+    "summary": "仓库即数据库、构建流程取舍、本地模式、性能优化——把 Pages 跑顺的完整经验总结。",
+    "category": "前端"
+  },
+  {
+    "title": "一套主题色，派生全站配色：CSS 变量工程化实践",
+    "date": "2026-09-20",
+    "updated": "2026-09-20",
+    "file": "css-variable-theming.html",
+    "summary": "只配置一个 #1d6ff2，hover 深色、浅底高亮全由程序混色算出。聊聊 CSS 变量 + 运行时注入的配色系统怎么搭。",
+    "category": "前端"
+  },
+  {
+    "title": "毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区",
+    "date": "2026-09-17",
+    "updated": "2026-09-17",
+    "file": "glassmorphism-panel.html",
+    "summary": "给网址导航加一个毛玻璃盒子：玻璃质感四要素、Safari 兼容、性能边界，以及为什么样式改动可以零 JS 侵入。",
+    "category": "本站志"
+  },
+  {
+    "title": "CSS Grid 实战：用网格做响应式卡片墙",
+    "date": "2026-09-15",
+    "updated": "2026-09-15",
+    "file": "css-grid-layout.html",
+    "summary": "repeat + minmax 自动换列、grid-template-areas 复杂布局、什么时候选 Grid 什么时候选 Flexbox——一文讲透。",
+    "category": "前端"
+  },
+  {
+    "title": "版式的底层逻辑：网格、留白与视觉层级",
+    "date": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "typography-grid.html",
+    "summary": "「看起来舒服」的版面都有迹可循：网格给对齐、留白给分组、层级给动线，附一份动手前的自查清单。",
+    "category": "平面设计"
+  },
+  {
+    "title": "博客的第一印象：标题与摘要怎么写",
+    "date": "2026-09-10",
+    "updated": "2026-09-10",
+    "file": "blog-title-summary.html",
+    "summary": "标题说「是什么」，摘要说「为什么」。写完自查三问：3 秒内能说出讲什么吗？能说出有什么用吗？自己会点进来吗？",
+    "category": "写作"
+  },
+  {
+    "title": "写给工程师的 UI 设计速成：间距、圆角、配色都是参数系统",
+    "date": "2026-09-08",
+    "updated": "2026-09-08",
+    "file": "ui-for-engineers.html",
+    "summary": "设计不是天赋是约束：间距阶梯、字号阶梯、一个主色加一套灰阶，把设计决策固化成代码里的 DESIGN_TOKENS。",
+    "category": "UI 设计"
+  },
+  {
+    "title": "浏览器里的数据库：localStorage 使用心得与陷阱",
+    "date": "2026-08-30",
+    "updated": "2026-08-30",
+    "file": "local-storage-notes.html",
+    "summary": "五个方法撑起本地模式：5MB 容量的 UTF-16 陷阱、JSON 序列化翻车点、为什么 clear() 是核弹，以及正确的前缀删除姿势。",
+    "category": "前端"
+  },
+  {
+    "title": "欢迎使用 Self Static Blog",
+    "date": "2026-09-19",
+    "updated": "2026-09-19",
+    "file": "welcome.html",
+    "summary": "这是一篇示例文章，演示文章页的排版效果。你可以登录后台 /admin/ 编辑或删除它。",
+    "category": "公告"
+  }
+]

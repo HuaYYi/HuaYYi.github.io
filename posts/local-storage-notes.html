@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>浏览器里的数据库：localStorage 使用心得与陷阱 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "浏览器里的数据库：localStorage 使用心得与陷阱",
+    "date": "2026-08-30",
+    "updated": "2026-08-30",
+    "category": "前端",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">浏览器里的数据库：localStorage 使用心得与陷阱</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>这个博客的本地模式把文章全存在 localStorage 里——不连服务器、不要令牌，关掉浏览器再打开文章还在。它是最容易被低估的浏览器能力之一：API 只有五个方法，但坑一个不少。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%89%81%E5%B9%B3%E6%8F%92%E7%94%BB%EF%BC%8C%E6%B5%8F%E8%A7%88%E5%99%A8%E7%AA%97%E5%8F%A3%E9%87%8C%E6%9C%89%E6%8A%BD%E5%B1%89%E5%BC%8F%E6%94%B6%E7%BA%B3%E6%9F%9C%E5%92%8C%E5%9C%86%E6%9F%B1%E5%BD%A2%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8E%E4%BE%BF%E7%AD%BE%EF%BC%8C%E8%93%9D%E8%89%B2%E7%A7%91%E6%8A%80%E9%A3%8E%EF%BC%8C%E7%AE%80%E6%B4%81%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="浏览器窗口中的收纳柜与数据库插画" loading="lazy">
+          <figcaption>localStorage 像浏览器自带的小抽屉：随手能放，但容量和规矩都得心里有数</figcaption>
+        </figure>
+
+        <h2>30 秒速览</h2>
+        <pre><code>localStorage.setItem('key', 'value'); // 存（值只能是字符串）
+localStorage.getItem('key');           // 取，不存在返回 null
+localStorage.removeItem('key');        // 删单个
+localStorage.clear();                  // 清空整个来源！
+localStorage.length;                   // 键值对数量</code></pre>
+        <p>它按「来源」（协议 + 域名 + 端口）隔离：localhost 和线上域名互不可见，不同端口也算不同来源。数据永久保存，除非用户清缓存或代码删除。</p>
+
+        <h2>陷阱一：容量只有约 5MB，且按 UTF-16 计</h2>
+        <p>localStorage 的容量配额通常按 UTF-16 编码计算，也就是一个非 BMP 字符（比如部分 emoji）要占 4 字节。存纯文本问题不大，但本站本地模式允许把图片转成 dataURL 存进去——base64 会让体积膨胀约 33%，几张高清图就能把配额吃满。所以写入大图前先提醒用户，存图优先走仓库 <code>assets/images/</code> 而不是 localStorage。</p>
+
+        <h2>陷阱二：结构化数据要自己序列化</h2>
+        <p>值只能是字符串，存对象要 <code>JSON.stringify</code>，取出来 <code>JSON.parse</code>。两处经典翻车：</p>
+        <ul>
+          <li>忘记 stringify，存进去的是 <code>"[object Object]"</code>，取出来哭都来不及；</li>
+          <li><code>JSON.parse(null)</code> 会返回 <code>null</code> 没问题，但 parse 遇到损坏的字符串会<strong>抛异常</strong>。所以读取必须包 try/catch，本站的写法是解析失败就回退到空数组，绝不让一份数据坏掉拖垮整个页面。</li>
+        </ul>
+
+        <h2>陷阱三：clear() 是核弹</h2>
+        <p>同一来源下所有应用的键共用一个 localStorage。如果你的页面嵌在别人的域下（或反过来），<code>clear()</code> 会把不相关的数据一起带走。正确姿势是<strong>键名加前缀 + 按前缀遍历删除</strong>：</p>
+        <pre><code>// 只删自己的键：本站所有键都以 ssb. 开头
+for (var i = localStorage.length - 1; i >= 0; i--) {
+  var k = localStorage.key(i);
+  if (k.indexOf('ssb.') === 0) localStorage.removeItem(k);
+}</code></pre>
+        <p>倒序遍历是因为删除会改变索引，正序删会漏。本站角标上的「清空缓存」按钮就是按这个思路实现的：删 <code>ssb.local.posts</code> 和全部 <code>ssb.local.content.*</code>，不碰搜索引擎选择等其他前缀的键。</p>
+
+        <h2>什么时候不该用它</h2>
+        <ul>
+          <li>数据需要跨设备同步 → 它只在单个浏览器里存在；</li>
+          <li>数据量大或需要检索排序 → 上 IndexedDB；</li>
+          <li>敏感信息（令牌之类）→ XSS 可直接读到，能不放就不放；</li>
+          <li>只是临时记住 UI 状态 → 它反而合适，但记得存版本号，将来结构变了好迁移。</li>
+        </ul>
+
+        <h2>写满了怎么办：QuotaExceededError</h2>
+        <p><code>setItem</code> 超配额时不是静默失败，而是抛异常。如果不 try/catch，保存动作会直接报错中断，用户还不知道文章没存上。稳妥写法：</p>
+        <pre><code>try {
+  localStorage.setItem(key, JSON.stringify(data));
+} catch (err) {
+  alert('本地存储空间已满，请清理图片或导出后删除旧文章');
+}</code></pre>
+        <p>更进一步可以在写入前估算大小：<code>new Blob([value]).size</code> 拿到 UTF-8 字节数，配合 <code>navigator.storage.estimate()</code>（返回配额与已用量，支持度不错）提前预警，而不是等写崩了再说。</p>
+
+        <h2>多标签页同步：storage 事件</h2>
+        <p>同一个来源开了两个标签页，A 页改了 localStorage，B 页怎么知道？浏览器会在<strong>其他</strong>标签页触发 <code>storage</code> 事件（注意：改动它的那个页面本身不触发）：</p>
+        <pre><code>window.addEventListener('storage', function (e) {
+  if (e.key === 'ssb.local.posts') {
+    refreshPostList();   // e.newValue 就是新值，免一次读取
+  }
+});</code></pre>
+        <p>本站后台写文章、前台列表开着的场景，靠这个事件就能做到「后台一保存，前台自动出现」，不需要轮询。</p>
+
+        <h2>三兄弟怎么选</h2>
+        <table>
+          <thead>
+            <tr><th>能力</th><th>localStorage</th><th>sessionStorage</th><th>IndexedDB</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>生命周期</td><td>永久（手动清除前）</td><td>标签页关闭即清</td><td>永久</td></tr>
+            <tr><td>容量</td><td>约 5MB</td><td>约 5MB</td><td>通常百 MB 起</td></tr>
+            <tr><td>数据类型</td><td>字符串</td><td>字符串</td><td>对象/Blob/文件</td></tr>
+            <tr><td>典型场景</td><td>配置、草稿、小缓存</td><td>表单暂存、跳转传参</td><td>离线数据、图片库</td></tr>
+          </tbody>
+        </table>
+        <p>本站的取舍：文章正文是 HTML 字符串、单篇几十 KB，localStorage 够用；图片 dataURL 是容量杀手，所以明确提示走仓库上传，而不是什么都往里塞——<strong>工具选型先看数据形态，再看 API 顺手程度</strong>。</p>
+
+        <blockquote>
+          <p>localStorage 像抽屉：小、方便、就在手边。放对东西它是救星，放错东西它是隐患——关键是你得知道它的边界。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>

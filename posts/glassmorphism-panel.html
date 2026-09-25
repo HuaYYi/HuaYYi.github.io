@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区 - My Blog</title>
+  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <script type="application/json" class="post-data">
+  {
+    "title": "毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区",
+    "date": "2026-09-17",
+    "updated": "2026-09-17",
+    "category": "本站志",
+    "cover": ""
+  }
+  </script>
+  <link rel="stylesheet" href="../assets/css/common.css">
+  <link rel="stylesheet" href="../assets/css/post.css">
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="post-layout">
+    <main class="post-container">
+      <h1 class="post-title">毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区</h1>
+      <div class="post-meta" id="post-meta"><!-- 由 post.js 渲染 --></div>
+
+      <article class="post-content">
+        <p>首页背景有一层缓慢飘浮的彩色圆，氛围是有了，但它们穿过网址导航区域时会让卡片显得杂乱。这次给导航区加了一个「毛玻璃盒子」：既能划出明确的功能分区，又把背后的干扰模糊掉。顺手把实现细节记下来。</p>
+
+        <figure>
+          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=%E6%AF%9B%E7%8E%BB%E7%92%83%E8%B4%A8%E6%84%9FUI%EF%BC%8C%E5%8D%8A%E9%80%8F%E6%98%8E%E7%A3%A8%E7%A0%82%E7%8E%BB%E7%92%83%E5%8D%A1%E7%89%87%E6%82%AC%E6%B5%AE%E5%9C%A8%E8%93%9D%E7%B4%AB%E6%B8%90%E5%8F%98%E5%85%89%E6%96%91%E5%89%8D%EF%BC%8C%E7%8E%B0%E4%BB%A3%E6%9E%81%E7%AE%80%E8%AE%BE%E8%AE%A1%EF%BC%8C%E6%97%A0%E6%96%87%E5%AD%97&image_size=landscape_16_9" alt="毛玻璃质感卡片悬浮在彩色光斑前" loading="lazy">
+          <figcaption>毛玻璃的精髓不是「透明」，而是透过它的东西依然存在、但被柔化了</figcaption>
+        </figure>
+
+        <h2>玻璃质感四要素</h2>
+        <p>市面上看着舒服的毛玻璃（glassmorphism）效果，拆开基本是四件事，缺一则假：</p>
+        <ul>
+          <li><strong>半透明底色</strong>：白色调到 55% 左右，隐约透出背景但不抢戏；</li>
+          <li><strong>背景模糊 + 提饱和</strong>：<code>backdrop-filter: blur(16px) saturate(160%)</code>，blur 负责雾化，saturate 负责让透过的颜色不发灰；</li>
+          <li><strong>高光细边</strong>：1px 的半透明白边框，是「玻璃有厚度」的关键暗示；</li>
+          <li><strong>大而柔的投影</strong>：低透明度、大扩散半径，营造悬浮感，避免生硬的黑边阴影。</li>
+        </ul>
+        <pre><code>.nav-zone {
+  background: rgba(255, 255, 255, .55);
+  -webkit-backdrop-filter: blur(16px) saturate(160%); /* Safari */
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(60, 80, 180, .10);
+}</code></pre>
+
+        <h2>兼容性与性能</h2>
+        <p>Safari 至今需要 <code>-webkit-</code> 前缀，两行都要写。性能上，backdrop-filter 是「把身后那片画面重新采样模糊」，面积越大、模糊半径越大，合成开销越高；导航内部十来张小卡片又各自带了一层轻模糊，属于可接受范围，但不宜再嵌套大面积模糊。实际观感上，盒子已经把背景雾化过一遍，卡片里的那层小模糊可以考虑去掉——这是下一轮优化的候选项。</p>
+
+        <h2>滚轮分区：为什么加盒子不用改 JS</h2>
+        <p>这个页面的滚轮是分区处理的：导航盒子内滚动 → 翻导航页；盒子外滚动 → 翻屏去第二屏。判断代码只有一行：</p>
+        <pre><code>if (e.target.closest('#nav-zone')) { /* 翻导航页 */ }</code></pre>
+        <p>因为毛玻璃盒子直接做在 <code>#nav-zone</code> 元素本身（加 padding、背景、边框），而不是外面再包一层 div，事件冒泡的目标不变，<code>closest</code> 的命中范围和盒子的视觉范围天然重合。样式改动零 JS 侵入——这其实是当初把容器 id 留在最外层的回报。</p>
+
+        <h2>参数可配</h2>
+        <p>透明度和模糊强度是很主观的东西，所以抽成了 <code>site-config.json</code> 的 <code>navPanel</code> 节点：<code>enable</code> 一键关闭盒子、<code>opacity</code> 控制白底浓度、<code>blur</code> 控制雾化强度。JS 只负责把参数写成 CSS 变量注入，样式细节仍然收敛在 CSS 一处。</p>
+
+        <h2>降级与无障碍：玻璃不是刚需</h2>
+        <p><code>backdrop-filter</code> 在较老的浏览器（以及某些系统的「减少透明度」辅助设置下）会直接失效。此时半透明白底仍然在，最坏情况是「看得更透一点」，不至于内容不可读——这是选 55% 而不是 15% 白底的另一个原因：<strong>模糊失效时，底色自己也得撑得住可读性</strong>。</p>
+        <p>另一个要留意的是文字与背景的对比度。玻璃后面如果恰好滚过高亮色块，压在上面的深色文字可能短暂「发花」。本站导航里都是卡片（卡片本身又是白底），文字不直接贴在玻璃上，规避了这个问题；如果未来要在玻璃上直接放正文，需要额外加一层文字底色或者提高面板不透明度。</p>
+
+        <h2>什么时候不该用毛玻璃</h2>
+        <ul>
+          <li>背后没有值得「透」的东西时——纯白页面上盖玻璃，只剩一层意义不明的灰边；</li>
+          <li>大面积表单、长文阅读区——持续的模糊合成费电，读者也容易视觉疲劳；</li>
+          <li>低性能设备密集出现时——手机上同时开多层 backdrop-filter，掉帧是肉眼可见的。</li>
+        </ul>
+        <p>毛玻璃适合做「层」的暗示：浮层、卡片、分区面板；不适合做「面」的主体。克制使用，它才会一直好看。</p>
+
+        <blockquote>
+          <p>好的交互分区应该让人不需要学习：盒子里随便滚，滚不出界；盒子外一滚就走。视觉边界与事件边界重合时，这两件事是同一件事。</p>
+        </blockquote>
+      </article>
+    </main>
+
+    <aside class="post-toc" id="post-toc"></aside>
+  </div>
+
+  <div class="post-tools" id="post-tools"></div>
+
+  <footer id="site-footer"></footer>
+
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/post.js"></script>
+  <script src="../assets/js/context-menu.js"></script>
+</body>
+</html>
