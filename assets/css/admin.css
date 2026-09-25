@@ -1284,6 +1284,50 @@ body {
   flex-shrink: 0;
 }
 
+/* 行首图标格（数据 tab：实时匹配/手动上传状态可视化） */
+.ri-box {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef0f4;
+  color: #9097a3;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+}
+.ri-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* letter 态必须与前台徽章同态（nav-card-badge / bs-engine-icon）：
+   主色浅底 + 主色字；灰底仅留给空行/转圈等未决状态 */
+.ri-box[data-state="letter"] {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+}
+.ri-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cbd0d9;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ri-spin 0.7s linear infinite;
+}
+@keyframes ri-spin {
+  to { transform: rotate(360deg); }
+}
+.repeat-row .icon-upload {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  font-size: 12.5px;
+}
+
 /* 网址导航分类块 */
 .nav-group {
   border: 1px solid var(--border);

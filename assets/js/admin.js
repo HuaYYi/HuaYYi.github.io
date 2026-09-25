@@ -972,11 +972,34 @@
 
   /* ---------- 重复行 / 分组的 HTML 构造 ---------- */
 
+  /* 行首图标格初始 HTML（数据 tab 用）：
+     已有 __icon（本浏览器匹配/上传后）→ 直接显示 dataURL；
+     否则按 hostname 乐观显示仓库图标（../assets/icons/sites/，
+     加载失败由捕获阶段 error 委托换成首字母）；连 host 都没有显示「？」 */
+  function riBoxHTML(item) {
+    item = item || {};
+    var letter = escapeHTML((item.name || '?').slice(0, 1));
+    if (item.__icon) {
+      return '<span class="ri-box" data-state="icon">' +
+        '<img class="ri-img" src="' + escapeHTML(item.__icon) + '" alt=""></span>';
+    }
+    var host = itemHost(item);
+    if (host) {
+      return '<span class="ri-box" data-state="repo">' +
+        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + host + '.png" alt="">' +
+        '<span class="ri-letter" style="display:none">' + letter + '</span>' +
+      '</span>';
+    }
+    return '<span class="ri-box" data-state="empty"><span class="ri-letter">?</span></span>';
+  }
+
   function engineRowHTML(e) {
     e = e || {};
     return '<div class="repeat-row">' +
+      riBoxHTML(e) +
       '<input class="r-name" placeholder="名称，如：百度" value="' + escapeHTML(e.name) + '">' +
       '<input class="r-url" placeholder="搜索 URL 前缀，如 https://www.baidu.com/s?wd=" value="' + escapeHTML(e.url) + '">' +
+      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
   }
@@ -997,8 +1020,10 @@
   function navLinkRowHTML(l) {
     l = l || {};
     return '<div class="repeat-row">' +
+      riBoxHTML(l) +
       '<input class="r-name" placeholder="网站名称" value="' + escapeHTML(l.name) + '">' +
       '<input class="r-url" placeholder="网址，如 https://www.baidu.com/" value="' + escapeHTML(l.url) + '">' +
+      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 64×64 PNG">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
   }
@@ -1201,8 +1226,9 @@
 
   /* ---------- 收集 + 校验 ---------- */
 
-  /* 读取 name/url 行；整行空跳过，只填一半返回错误提示 */
-  function collectPairs(container, where) {
+  /* 读取 name/url 行；整行空跳过，只填一半返回错误提示。
+     attachRow(item, rowEl)：engines/nav 传入，把行内图标实时状态带进数据 */
+  function collectPairs(container, where, attachRow) {
     var rows = [];
     var bad = null;
     container.querySelectorAll('.repeat-row').forEach(function (row) {
@@ -1215,6 +1241,7 @@
          保存时的差异比较基于 JSON.stringify，键序不同会误判为改动 */
       var iconSel = row.querySelector('.r-icon');
       var item = iconSel ? { name: name, icon: iconSel.value, url: url } : { name: name, url: url };
+      if (attachRow) attachRow(item, row);
       rows.push(item);
     });
     return { rows: rows, bad: bad };
@@ -2992,9 +3019,9 @@
      独立文件上传并从 JSON 剥离，仓库里不留临时字段。
      ============================================================ */
   var ICON_FALLBACK_HASH = {
-    /* icon.horse 灰色「T」占位（256×256/1027B，2026-09-25 实测） */
-    horse: 'aab3aec07be04977cbd7c3eabb49786b37932fef4e930eb535d805834fa646c1',
-    /* yandex 空白占位（16×16/70B，2026-09-25 实测） */
+    /* yandex 空白占位（16×16/70B，2026-09-25 实测，字节稳定）。
+       icon.horse 2026-09 起对无图域名改发「按域名首字母生成的灰底字母头像」，
+       每个域名字节都不同、哈希失效，改用像素特征判定（见 isHorseLetterPlaceholder） */
     yandex: '9681c0a0a13d8581f202bfaf62e53563ea6d0d6bd8e542b35b6d7c09b0e7b41b'
   };
   var ICON_SOURCES = [
@@ -3046,6 +3073,41 @@
     });
   }
 
+  /* 识别 icon.horse 的「灰底首字母」占位图（2026-09 起，无固定字节）。
+     实测特征：256×256，背景像素 (226,226,226)，背景覆盖 ≥91%，全图零彩色；
+     同期真实图标（notion 白/67%、figma 黑/76%、stripe 彩色）均不满足。
+     判定条件刻意全部用「与」，宁可漏判（显示其字母，仍合理）也不误伤真图标 */
+  function isHorseLetterPlaceholder(buf) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(new Blob([buf]));
+      var im = new Image();
+      im.onload = function () {
+        var c = document.createElement('canvas');
+        c.width = im.naturalWidth;
+        c.height = im.naturalHeight;
+        var g = c.getContext('2d');
+        g.drawImage(im, 0, 0);
+        URL.revokeObjectURL(url);
+        var d = g.getImageData(0, 0, c.width, c.height).data;
+        var cr = d[0], cg = d[1], cb = d[2];
+        /* 角像素必须接近 horse 占位的浅灰底 (226,226,226) */
+        var grayBg = cr >= 214 && cr <= 238 &&
+          Math.abs(cr - cg) <= 4 && Math.abs(cg - cb) <= 4;
+        if (!grayBg) { resolve(false); return; }
+        var graySum = 0, bgCount = 0, n = d.length / 4;
+        for (var i = 0; i < d.length; i += 4) {
+          var r = d[i], gg = d[i + 1], b = d[i + 2];
+          graySum += (Math.abs(r - gg) + Math.abs(gg - b)) / 2;
+          if (Math.abs(r - cr) < 14 && Math.abs(gg - cg) < 14 && Math.abs(b - cb) < 14) bgCount++;
+        }
+        resolve(graySum / n < 8 && bgCount / n >= 0.88);
+      };
+      /* 解码失败不当占位处理：交给后续流程（多半也会失败 → 首字母） */
+      im.onerror = function () { URL.revokeObjectURL(url); resolve(false); };
+      im.src = url;
+    });
+  }
+
   /* 为单个域名匹配图标：按源顺序尝试，两源都失败/都是占位 → null（前台走首字母） */
   function matchSiteIcon(host) {
     var chain = Promise.resolve(null);
@@ -3054,8 +3116,15 @@
         if (got) return got;
         return fetchBytes(src.build(host))
           .then(function (buf) {
+            if (src.name === 'horse') {
+              /* horse 占位按域名动态生成，只能解码后看像素特征 */
+              return isHorseLetterPlaceholder(buf).then(function (isPh) {
+                return isPh ? null : bytesToIconDataURL(buf);
+              });
+            }
+            /* yandex 占位字节固定，SHA-256 识别 */
             return sha256Hex(buf).then(function (hex) {
-              if (hex === ICON_FALLBACK_HASH[src.name]) return null; /* 无图占位，放弃 */
+              if (hex === ICON_FALLBACK_HASH.yandex) return null; /* 无图占位，放弃 */
               return bytesToIconDataURL(buf);
             });
           })
@@ -3178,6 +3247,8 @@
         }
       }
       delete it.__icon;
+      delete it.__iconHost;
+      delete it.__iconManual;
     });
 
     var cleanJSON = JSON.stringify(data, null, 2) + '\n';
@@ -3186,6 +3257,124 @@
       path: path,
       files: [{ path: path, content: cleanJSON }].concat(extraFiles)
     };
+  }
+
+  /* ============================================================
+     数据编辑器行内图标（2026-09-25）
+     编辑过程中就能看到每行图标：网址输入停顿 0.8s 自动匹配；
+     匹配失败显示首字母、可点「上传」自选图片（压 64×64 PNG）。
+     匹配状态按行 DOM 存在 liveIconMap（WeakMap），收集时带进数据，
+     保存后由基线 __icon 接管，提交时全部转独立 PNG 并剥离。
+       st = {dataURL, host, manual}
+       manual=true 用户手动上传：改网址也不自动覆盖
+     ============================================================ */
+  var liveIconMap = new WeakMap();
+  var iconUploadRow = null;
+
+  /* 按视图重绘某行的图标格 */
+  function renderRiBox(row, view) {
+    var box = row.querySelector('.ri-box');
+    if (!box) return;
+    box.dataset.state = view.state;
+    if (view.state === 'loading') {
+      box.innerHTML = '<span class="ri-spinner" aria-label="匹配中"></span>';
+    } else if (view.state === 'icon') {
+      box.innerHTML = '<img class="ri-img" src="' + escapeHTML(view.dataURL) + '" alt="">';
+    } else if (view.state === 'repo') {
+      box.innerHTML =
+        '<img class="ri-img" src="' + ROOT + 'assets/icons/sites/' + view.host + '.png" alt="">' +
+        '<span class="ri-letter" style="display:none"></span>';
+    } else if (view.state === 'letter') {
+      box.innerHTML = '<span class="ri-letter">' + escapeHTML(view.text || '?') + '</span>';
+    } else { /* empty */
+      box.innerHTML = '<span class="ri-letter">?</span>';
+    }
+  }
+
+  /* 取行内首字母（名称输入变化时联动） */
+  function rowLetter(row) {
+    var name = (row.querySelector('.r-name') || {}).value || '';
+    return name.trim().slice(0, 1) || '?';
+  }
+
+  /* 网址变化后的实时匹配（由 input 事件防抖调用） */
+  function liveMatchRow(row) {
+    var host = itemHost({ url: (row.querySelector('.r-url') || {}).value });
+    var st = liveIconMap.get(row);
+    if (st && st.manual) return;                 /* 手动上传：锁定，不覆盖 */
+    if (st && st.host === host && host) return;  /* 同 host 已匹配过 */
+
+    if (!host) {
+      liveIconMap.delete(row);
+      renderRiBox(row, { state: 'empty' });
+      return;
+    }
+    /* 仓库已有该 host 图标 → 直接显示本地路径，不发外站请求 */
+    loadRepoIconHosts().then(function (hostSet) {
+      if (hostSet && hostSet[host]) {
+        liveIconMap.delete(row);
+        renderRiBox(row, { state: 'repo', host: host });
+        return;
+      }
+      renderRiBox(row, { state: 'loading' });
+      matchSiteIcon(host).then(function (dataURL) {
+        if (dataURL) {
+          liveIconMap.set(row, { dataURL: dataURL, host: host, manual: false });
+          renderRiBox(row, { state: 'icon', dataURL: dataURL });
+        } else {
+          liveIconMap.delete(row); /* 失败不缓存：保存时 autoMatchIcons 会再试 */
+          renderRiBox(row, { state: 'letter', text: rowLetter(row) });
+        }
+      });
+    });
+  }
+
+  /* 手动上传处理（文件读取 + 64×64 压缩 + 行内预览） */
+  function handleIconFile(file) {
+    var row = iconUploadRow;
+    iconUploadRow = null;
+    if (!row || !file) return;
+    if (!/^image\//.test(file.type)) { toast('请选择图片文件', true); return; }
+    renderRiBox(row, { state: 'loading' });
+    var reader = new FileReader();
+    reader.onload = function () {
+      bytesToIconDataURL(reader.result)
+        .then(function (dataURL) {
+          var host = itemHost({ url: (row.querySelector('.r-url') || {}).value });
+          liveIconMap.set(row, { dataURL: dataURL, host: host, manual: true });
+          renderRiBox(row, { state: 'icon', dataURL: dataURL });
+        })
+        .catch(function () {
+          renderRiBox(row, { state: 'letter', text: rowLetter(row) });
+          toast('图片读取失败，请换 PNG/JPG 试试', true);
+        });
+    };
+    reader.onerror = function () { toast('图片读取失败', true); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* 收集时把行内实时状态（自动匹配/手动上传）复制到数据条目 */
+  function attachLiveIcon(item, row) {
+    var st = liveIconMap.get(row);
+    if (!st) return;
+    item.__icon = st.dataURL;
+    item.__iconHost = st.host;
+    if (st.manual) item.__iconManual = 1;
+  }
+
+  /* 收集后按 URL 继承基线（上次保存时的数据）图标：
+     未提交前再次保存，已匹配的条目不重抓，省 icon.horse 配额 */
+  function carryBaselineIcons(rows, file, kind) {
+    var byURL = {};
+    iconDataItems(appsData.data[file] || [], kind).forEach(function (it) {
+      if (it.__icon) byURL[it.url] = it;
+    });
+    rows.forEach(function (r) {
+      if (r.__icon || !byURL[r.url]) return;
+      r.__icon = byURL[r.url].__icon;
+      r.__iconHost = byURL[r.url].__iconHost;
+      if (byURL[r.url].__iconManual) r.__iconManual = 1;
+    });
   }
 
   function renderAppTabs() {
@@ -3360,6 +3549,12 @@
         '</div>';
     }
     $('ae-data').innerHTML = html;
+    /* engines/nav：行内「上传」共用的隐藏文件选择框（change 委托统一处理） */
+    if (kind === 'engines' || kind === 'nav') {
+      $('ae-data').insertAdjacentHTML('beforeend',
+        '<input type="file" id="ae-icon-file" style="display:none" ' +
+        'accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,image/vnd.microsoft.icon">');
+    }
   }
 
   /* ---------- 收集 + 保存 ---------- */
@@ -3414,20 +3609,25 @@
     var dataOut = null;
     var kind = appDataKind(dataFile);
     if (kind === 'engines') {
-      var eng = collectPairs($('ae-engines'), '搜索引擎');
+      var eng = collectPairs($('ae-engines'), '搜索引擎', attachLiveIcon);
       if (eng.bad) return { error: eng.bad };
+      carryBaselineIcons(eng.rows, dataFile, kind);
       dataOut = eng.rows;
     } else if (kind === 'nav') {
       var nav = [];
       var navBad = null;
       document.querySelectorAll('#ae-nav-groups .nav-group').forEach(function (grp) {
         var cat = ((grp.querySelector('.g-name') || {}).value || '').trim();
-        var links = collectPairs(grp.querySelector('.nav-link-rows'), '导航链接');
+        var links = collectPairs(grp.querySelector('.nav-link-rows'), '导航链接', attachLiveIcon);
         if (links.bad) navBad = links.bad;
         if (!cat || !links.rows.length) return;
         nav.push({ category: cat, links: links.rows });
       });
       if (navBad) return { error: navBad };
+      /* 基线继承跨全部分类按 URL 匹配（用户可能移动过链接的分类） */
+      var navAll = [];
+      nav.forEach(function (g) { g.links.forEach(function (l) { navAll.push(l); }); });
+      carryBaselineIcons(navAll, dataFile, kind);
       dataOut = nav;
     } else if (kind === 'quotes') {
       dataOut = $('ae-quotes').value.split('\n')
@@ -4476,6 +4676,15 @@
       var grpDel = e.target.closest('.group-del');
       if (grpDel) { grpDel.closest('.nav-group').remove(); return; }
 
+      /* 行内「上传」：记住目标行，打开共用文件选择框（change 事件处理压缩） */
+      var upBtn = e.target.closest('.icon-upload');
+      if (upBtn) {
+        iconUploadRow = upBtn.closest('.repeat-row');
+        var fileBox = $('ae-icon-file');
+        if (fileBox) fileBox.click();
+        return;
+      }
+
       if (e.target.closest('#ae-engine-add')) {
         $('ae-engines').insertAdjacentHTML('beforeend', engineRowHTML());
         return;
@@ -4489,6 +4698,44 @@
           .insertAdjacentHTML('beforeend', navLinkRowHTML());
       }
     });
+
+    /* 图标文件选中：交给 handleIconFile（压缩 64×64 + 行内预览） */
+    $('ae-data').addEventListener('change', function (e) {
+      if (e.target.id !== 'ae-icon-file') return;
+      var file = e.target.files && e.target.files[0];
+      e.target.value = '';   /* 选同一个文件也要能再次触发 change */
+      handleIconFile(file);
+    });
+
+    /* 网址输入防抖实时匹配；名称输入时联动首字母徽章。
+       计时器按行存 WeakMap，连续打字只发最后一次请求 */
+    var urlTimers = new WeakMap();
+    $('ae-data').addEventListener('input', function (e) {
+      var row = e.target.closest('.repeat-row');
+      if (!row) return;
+      if (e.target.classList.contains('r-url')) {
+        clearTimeout(urlTimers.get(row));
+        urlTimers.set(row, setTimeout(function () { liveMatchRow(row); }, 800));
+      } else if (e.target.classList.contains('r-name')) {
+        var box = row.querySelector('.ri-box');
+        if (box && box.dataset.state === 'letter') {
+          box.querySelector('.ri-letter').textContent =
+            (e.target.value || '?').trim().slice(0, 1) || '?';
+        }
+      }
+    });
+
+    /* 仓库图标 img 加载失败（未提交/缺文件）→ 首字母。
+       error 不冒泡，用捕获阶段统一拦截 */
+    $('ae-data').addEventListener('error', function (e) {
+      if (!e.target.classList || !e.target.classList.contains('ri-img')) return;
+      var box = e.target.closest('.ri-box');
+      if (!box || box.dataset.state === 'icon') return; /* dataURL 失败不处理 */
+      var row = box.closest('.repeat-row');
+      box.dataset.state = 'letter';
+      box.innerHTML = '<span class="ri-letter">' +
+        escapeHTML(row ? rowLetter(row) : '?') + '</span>';
+    }, true);
 
     /* 代码编辑器：Tab 键插入两个空格而不是跳焦 */
     $('ae-code').addEventListener('keydown', function (e) {
