@@ -60,10 +60,6 @@
     ta.remove();
   }
 
-  function isDark() {
-    return document.documentElement.dataset.theme === 'dark';
-  }
-
   /* ---------- 菜单 DOM 构建 ---------- */
   function ensureMenu() {
     if (menuEl) return menuEl;
@@ -338,6 +334,32 @@
     });
   }
 
+  /* ---------- 「主题模式」子菜单：自动（跟随系统）/ 亮色 / 暗色 ----------
+     勾选态和切换都走 common.js 暴露的 BlogUtils 三态接口，
+     头部三段开关与右键菜单永远同步 */
+  var THEME_OPTIONS = [
+    { mode: 'auto', label: '自动（跟随系统）', icon: 'auto' },
+    { mode: 'light', label: '亮色', icon: 'sun' },
+    { mode: 'dark', label: '暗色', icon: 'moon' }
+  ];
+
+  function themeSubmenu() {
+    return submenuNode('主题模式', U ? U.icon('auto') : '', function () {
+      var current = U.getThemeMode();
+      return THEME_OPTIONS.map(function (opt) {
+        return itemNode({
+          label: opt.label,
+          icon: U ? U.icon(opt.icon) : '',
+          checked: current === opt.mode,
+          onClick: function () {
+            U.setThemeMode(opt.mode);
+            return true;   /* 保持菜单打开，让勾选态即时反映 */
+          }
+        });
+      });
+    });
+  }
+
   /* ---------- 根据点击目标组装整份菜单 ---------- */
   function build(target) {
     var m = ensureMenu();
@@ -353,15 +375,20 @@
     /* 通用组 */
     var common = [];
 
-    common.push(itemNode({
-      label: isDark() ? '切换到亮色模式' : '切换到暗色模式',
-      icon: U ? U.icon(isDark() ? 'sun' : 'moon') : '',
-      onClick: function () {
-        /* 复用头部主题开关（common.js 已做事件委托，主色派生/图标/记忆都在那里） */
-        var btn = document.querySelector('.theme-toggle');
-        if (btn) btn.click();
-      }
-    }));
+    /* 文章页：目录开关（窄屏开右侧抽屉，宽屏显隐侧栏）。
+       post.js 把动作暴露在 window.SSBPost；有 h2/h3 时才出现 */
+    if (window.SSBPost && window.SSBPost.hasTOC) {
+      common.push(itemNode({
+        label: window.SSBPost.tocVisible() ? '收起目录' : '文章目录',
+        icon: U ? U.icon('list') : '',
+        onClick: function (node) {
+          window.SSBPost.toggleTOC();
+          /* 窄屏点目录是开抽屉，菜单可以关掉；保持返回默认（关闭） */
+        }
+      }));
+    }
+
+    common.push(themeSubmenu());
 
     var bg = screenAllowsBg(target) ? bgSubmenu() : null;
     if (bg) common.push(bg);
@@ -386,8 +413,11 @@
     common.forEach(function (n) { m.appendChild(n); });
   }
 
-  /* ---------- 定位与显隐（视口边缘翻转，避免菜单溢出屏幕） ---------- */
-  function show(x, y) {
+  /* ---------- 定位与显隐（视口边缘翻转，避免菜单溢出屏幕） ----------
+     传入 anchor（「⋯」按钮的 rect）时走锚定模式：菜单优先出现在
+     按钮正上方并留 8px 缝隙，按钮始终可见、可再次点击收起；
+     上方空间不足时翻到按钮下方 */
+  function show(x, y, anchor) {
     var m = ensureMenu();
     m.style.display = 'block';
     m.classList.add('ssb-ctx-anim');
@@ -396,8 +426,19 @@
     var vw = document.documentElement.clientWidth;
     var vh = document.documentElement.clientHeight;
 
-    if (x + w > vw - 8) x = Math.max(8, vw - w - 8);
-    if (y + h > vh - 8) y = Math.max(8, vh - h - 8);
+    if (anchor) {
+      /* 水平夹进视口（x 是按 -220 估算的位置，真实宽度可能不同） */
+      x = Math.max(8, Math.min(x, vw - w - 8));
+      if (anchor.top - 8 >= h) {
+        y = anchor.top - h - 8;               /* 上方放得下：菜单底沿距按钮 8px */
+      } else {
+        y = anchor.bottom + 8;                /* 放不下：翻到按钮下方 */
+        if (y + h > vh - 8) y = Math.max(8, vh - h - 8);
+      }
+    } else {
+      if (x + w > vw - 8) x = Math.max(8, vw - w - 8);
+      if (y + h > vh - 8) y = Math.max(8, vh - h - 8);
+    }
     m.style.left = x + 'px';
     m.style.top = y + 'px';
 
@@ -437,11 +478,14 @@
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
+      /* 菜单已打开时再点按钮 = 收起（菜单不再盖住按钮，锚点始终可点） */
+      if (menuEl && menuEl.style.display === 'block') { hide(); return; }
       var r = btn.getBoundingClientRect();
       lastTarget = btn;
       build(btn);
+      /* 第三参传按钮 rect：show 内部按真实菜单高度把它放到按钮上方 */
       show(Math.min(r.left, document.documentElement.clientWidth - 220),
-           r.top - menuEl.offsetHeight - 8);
+           r.top, r);
     });
     document.body.appendChild(btn);
   }

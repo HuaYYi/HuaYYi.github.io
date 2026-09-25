@@ -928,7 +928,6 @@
 '    </main>\n\n' +
 '    <aside class="post-toc" id="post-toc"></aside>\n' +
 '  </div>\n\n' +
-'  <div class="post-tools" id="post-tools"></div>\n\n' +
 '  <footer id="site-footer"></footer>\n\n' +
 '  <script src="../assets/js/common.js"></script>\n' +
 '  <script src="../assets/js/post.js"></script>\n' +
@@ -1047,7 +1046,7 @@
             '<input type="color" id="st-primary-color" class="color-input" title="点此选色">' +
             '<input type="text" id="st-primary" placeholder="#1d6ff2" autocomplete="off">' +
           '</div></label>' +
-        '<label class="form-field"><span>暗色模式默认（访客手动切换后记住自己的选择）</span>' +
+        '<label class="form-field"><span>默认外观（访客在「自动跟随系统 / 亮色 / 暗色」间自行选择并记住）</span>' +
           '<select id="st-dark">' +
             '<option value="auto">跟随系统外观</option>' +
             '<option value="light">默认亮色</option>' +

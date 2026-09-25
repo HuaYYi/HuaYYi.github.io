@@ -454,47 +454,71 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 }
 
 /* ============================================================
-   暗色模式开关（桌面头部圆形幽灵按钮 / 移动抽屉整行）
+   主题模式三段开关（自动跟随系统 / 亮色 / 暗色）
+   桌面头部放小号胶囊；移动抽屉里放大号并配一行说明
    ============================================================ */
-.theme-toggle {
-  width: 36px;
-  height: 36px;
+.theme-switch {
   flex-shrink: 0;
-  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+.theme-switch button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-2);
+  color: var(--text-3);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background .2s, color .2s;
 }
-.theme-toggle:hover {
-  background: var(--bg-soft);
+.theme-switch button:hover {
   color: var(--primary);
 }
-.theme-toggle svg {
+.theme-switch button.active {
+  background: var(--primary);
+  color: #fff;
+}
+.theme-switch button.active:hover {
+  color: #fff;
+}
+.theme-switch svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* 移动端抽屉：三段开关整行放大，下面跟一行说明文字 */
+.mobile-drawer .theme-switch {
+  width: 100%;
+  justify-content: space-between;
+  gap: 6px;
+  border-radius: var(--radius);
+  padding: 5px;
+  margin-bottom: 6px;
+}
+.mobile-drawer .theme-switch button {
+  flex: 1;
+  width: auto;
+  height: 38px;
+  border-radius: var(--radius-sm, 8px);
+}
+.mobile-drawer .theme-switch svg {
   width: 19px;
   height: 19px;
 }
-
-/* 移动端抽屉里的开关：整行按钮，文字在图标右侧 */
-.theme-toggle-mobile {
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-  padding: 12px 4px;
-  margin-bottom: 14px;
-  gap: 10px;
-  justify-content: flex-start;
-  font-size: 15px;
-  font-family: inherit;
-  color: var(--text);
-}
-.theme-toggle-mobile::after {
-  content: attr(title);   /* 复用按钮 title 显示「切换到暗色模式」文字 */
-  font-size: 15px;
+.theme-switch-hint {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--text-3);
 }
 
 /* ============================================================

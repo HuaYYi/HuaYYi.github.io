@@ -3,13 +3,19 @@
    1. 读取文章内嵌的 .post-data 元数据，渲染封面与元信息行
    2. 自动从 h2/h3 生成右侧多级目录（编号样式见 post.css）
    3. 滚动时高亮当前章节
-   4. 左侧悬浮工具：目录开关（窄屏抽屉）、回到顶部
+   4. 目录开关/回到顶部动作暴露在 window.SSBPost，由右键菜单
+      （含手机右下角「⋯」工具箱）调用，不再渲染左侧悬浮按钮
    ============================================================ */
 
 (function () {
   'use strict';
 
   var U = window.BlogUtils;
+
+  /* 窄屏（目录抽屉化的断点，与 post.css 的 1000px 保持一致） */
+  function isNarrow() {
+    return window.matchMedia('(max-width: 1000px)').matches;
+  }
 
   window.initPage = function (config) {
     var metaEl = document.querySelector('.post-data');
@@ -22,7 +28,6 @@
 
     renderCover(meta);
     renderMeta(meta, config, article);
-    renderTools();
     buildTOC(article);
     injectSEO(meta, article);
     renderPager();
@@ -158,41 +163,21 @@
     wrap.innerHTML = html;
   }
 
-  /* ---------- 左侧悬浮工具 ---------- */
-  function renderTools() {
-    var tools = document.getElementById('post-tools');
-    tools.innerHTML =
-      '<button type="button" id="tool-toc" title="目录" aria-label="目录">' + U.icon('list') + '</button>' +
-      '<button type="button" id="tool-top" title="回到顶部" aria-label="回到顶部">' + U.icon('top') + '</button>';
-
-    var isNarrow = function () { return window.matchMedia('(max-width: 1000px)').matches; };
-    var tocBtn = document.getElementById('tool-toc');
-    var topBtn = document.getElementById('tool-top');
-
-    /* 宽屏：显示/隐藏右侧目录；窄屏：右侧抽屉 */
-    tocBtn.addEventListener('click', function () {
-      if (isNarrow()) {
-        document.body.classList.toggle('toc-open');
-      } else {
-        document.body.classList.toggle('toc-hidden');
-      }
-    });
-
-    /* 窄屏点击目录链接后自动收起抽屉 */
-    document.getElementById('post-toc').addEventListener('click', function (e) {
-      if (isNarrow() && e.target.closest('a')) {
-        document.body.classList.remove('toc-open');
-      }
-    });
-
-    topBtn.addEventListener('click', function () {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    window.addEventListener('scroll', function () {
-      topBtn.classList.toggle('show', window.scrollY > 400);
-    }, { passive: true });
-  }
+  /* ---------- 目录动作（供右键菜单 / 手机「⋯」工具箱调用） ----------
+     hasTOC 由 buildTOC 按是否含 h2/h3 设置；宽屏开关右侧栏
+     （body.toc-hidden），窄屏开关右侧抽屉（body.toc-open） */
+  window.SSBPost = {
+    hasTOC: false,
+    tocVisible: function () {
+      return isNarrow()
+        ? document.body.classList.contains('toc-open')
+        : !document.body.classList.contains('toc-hidden');
+    },
+    toggleTOC: function () {
+      if (isNarrow()) document.body.classList.toggle('toc-open');
+      else document.body.classList.toggle('toc-hidden');
+    }
+  };
 
   /* ---------- 生成右侧目录 ---------- */
   function buildTOC(article) {
@@ -201,8 +186,10 @@
     if (!headings.length) {
       tocWrap.style.display = 'none';
       document.body.classList.add('toc-hidden');
+      /* hasTOC 保持 false，右键菜单不出现「文章目录」项 */
       return;
     }
+    window.SSBPost.hasTOC = true;
 
     /* 给没有 id 的标题补一个锚点 id */
     headings.forEach(function (h, i) {
@@ -237,11 +224,13 @@
     html += '</ol>';
     tocWrap.innerHTML = html;
 
-    /* 平滑滚动并避开固定头部（scroll-margin-top 已在 CSS 中设置） */
+    /* 平滑滚动并避开固定头部（scroll-margin-top 已在 CSS 中设置）；
+       窄屏点目录链接后自动收起右侧抽屉（原左侧按钮时代的行为） */
     tocWrap.addEventListener('click', function (e) {
       var link = e.target.closest('a');
       if (!link) return;
       e.preventDefault();
+      if (isNarrow()) document.body.classList.remove('toc-open');
       var target = document.getElementById(link.dataset.target);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       history.replaceState(null, '', '#' + link.dataset.target);

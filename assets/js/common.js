@@ -25,8 +25,10 @@
   /* ---------- 页面根路径（posts/ 子目录用 ../，其余用 ./） ---------- */
   var ROOT = /\/posts\//.test(location.pathname) ? '../' : './';
 
-  /* 尽早确定亮/暗色（配置还没拉到时先按手动选择或系统偏好），
-     尽量缩短暗色页面的白屏闪烁；配置到达后启动流程会再校准一次 */
+  /* 尽早确定亮/暗色（配置还没拉到时先按「偏好模式」解析），
+     尽量缩短暗色页面的白屏闪烁；配置到达后启动流程会再校准一次。
+     ssb.theme 存偏好模式：auto（跟随系统，默认）/ light / dark；
+     data-theme 存当前实际生效的亮/暗。auto 下这里先按系统偏好解析 */
   (function bootstrapThemeAttr() {
     var saved = null;
     try { saved = localStorage.getItem('ssb.theme'); } catch (e) {}
@@ -129,6 +131,11 @@
       return this.getLocalPosts().some(function (p) { return p.file === file; });
     },
 
+    /* 主题偏好模式三态接口（右键菜单「主题模式」子菜单使用；
+       实现见下方主题区块，函数声明提升，这里可直接引用） */
+    getThemeMode: function () { return themeMode(); },
+    setThemeMode: function (mode) { setThemeMode(mode); },
+
     /* 读取并缓存文章列表，按日期倒序；本地保存的文章会并入列表。
        合并按 file 去重：同一篇文章正在本地编辑时，本地条目覆盖仓库条目，
        避免列表出现重复行（提交后本地条目清除，自然回落到仓库版本） */
@@ -166,6 +173,8 @@
       /* 暗色模式开关：当前亮色时显示月亮（点我切到暗色），反之显示太阳 */
       moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
       sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+      /* 主题三态之「自动（跟随系统）」：显示器图标 */
+      auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
       /* 页脚社交图标（site-config.json 的 social[].icon：github / mail） */
       mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
       github: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>'
@@ -177,58 +186,95 @@
      顶部导航渲染（logo + 站内搜索 + 移动端汉堡抽屉）
      ============================================================ */
 
-  /* ---------- 暗色模式 ----------
-     优先级：用户手动选择（localStorage）> 配置 theme.dark > 系统偏好。
-     手动选择一旦存在就覆盖一切，符合开关直觉 */
+  /* ---------- 主题三态：auto（跟随系统）/ light / dark ----------
+     ssb.theme 存「用户偏好模式」，data-theme 存「当前实际生效的亮暗」。
+     实际值优先级：显式 light/dark > auto（配置 theme.dark 或系统偏好）。
+     显式选择一旦做出，任何机制（含壁纸明暗联动）都不得再覆盖——
+     旧版壁纸联动会把暗/亮色持久写回 ssb.theme，正是「手动切到
+     亮色却还是暗色」的病根；现在壁纸联动在 auto 下只改当前生效值，
+     不写偏好 */
   var THEME_KEY = 'ssb.theme';
 
   function systemPrefersDark() {
     return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   }
 
-  function resolveTheme(config) {
+  /* 用户偏好模式：只认 auto/light/dark，其它（含旧 null）视为 auto */
+  function themeMode() {
     var saved = null;
     try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* 隐私模式等场景忽略 */ }
+    return saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'auto';
+  }
+
+  /* 当前应当生效的亮/暗（auto 时：配置默认 > 系统偏好） */
+  function resolveTheme(config) {
+    var saved = themeMode();
     if (saved === 'light' || saved === 'dark') return saved;
-    var mode = config && config.theme && config.theme.dark;
-    if (mode === 'light' || mode === 'dark') return mode;
+    var cfg = config && config.theme && config.theme.dark;
+    if (cfg === 'light' || cfg === 'dark') return cfg;
     return systemPrefersDark() ? 'dark' : 'light';
   }
 
-  /* 设置主题（persist=true 写入 localStorage）。壁纸明暗联动与手动开关共用 */
-  function setTheme(next, persist) {
-    if (persist) {
-      try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* 忽略写入失败 */ }
-    }
-    document.documentElement.dataset.theme = next;
-    applyTheme(BlogUtils.config);          /* 主色在暗/亮下派生规则不同，重新算 */
-    updateThemeToggles(next);
+  /* 只设置「当前生效」的亮暗，不写偏好模式（壁纸明暗联动专用）。
+     主色在暗/亮下派生规则不同，所以要重新 applyTheme；
+     再同步头部/抽屉里三段开关的选中态 */
+  function applyResolvedTheme(tone) {
+    document.documentElement.dataset.theme = tone;
+    applyTheme(BlogUtils.config);
+    updateThemeUI(themeMode());
   }
 
-  function toggleTheme() {
-    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    /* 手动切主题 = 明确表态：关闭壁纸明暗跟随，避免下次刷新又被壁纸改回去 */
-    if (window.SSBScreenBG) window.SSBScreenBG.setFollowTone(false);
-    setTheme(next, true);
+  /* 用户选择偏好模式（头部/抽屉三段开关、右键菜单「主题模式」子菜单共用） */
+  function setThemeMode(mode) {
+    if (mode !== 'auto' && mode !== 'light' && mode !== 'dark') return;
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 忽略写入失败 */ }
+    /* 手动表态后关闭壁纸明暗跟随，避免壁纸重新应用时又带跑主题；
+       auto 模式下不关闭，保持「跟随系统」的默认体验 */
+    if (mode !== 'auto' && window.SSBScreenBG) window.SSBScreenBG.setFollowTone(false);
+    applyResolvedTheme(resolveTheme(BlogUtils.config));
   }
 
-  function updateThemeToggles(theme) {
-    var icon = theme === 'dark' ? 'sun' : 'moon';
-    var title = theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式';
-    document.querySelectorAll('.theme-toggle').forEach(function (btn) {
-      btn.innerHTML = BlogUtils.icon(icon);
-      btn.title = title;
-      btn.setAttribute('aria-label', title);
+  /* 同步所有三段开关：.active 打在当前模式上，title 写清含义 */
+  function updateThemeUI(mode) {
+    document.querySelectorAll('.theme-switch').forEach(function (box) {
+      box.querySelectorAll('[data-theme-mode]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.themeMode === mode);
+        var label = btn.dataset.themeMode === 'auto'
+          ? '自动（跟随系统）'
+          : (btn.dataset.themeMode === 'light' ? '亮色模式' : '暗色模式');
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+      });
     });
   }
 
-  /* 事件委托绑定一次：桌面头部和移动抽屉里的开关共用 .theme-toggle */
+  /* 事件委托绑定一次：桌面头部和移动抽屉里的三段开关共用 .theme-switch */
   if (!window.__themeBound) {
     window.__themeBound = true;
     document.addEventListener('click', function (e) {
-      if (e.target && typeof e.target.closest === 'function' &&
-          e.target.closest('.theme-toggle')) toggleTheme();
+      if (e.target && typeof e.target.closest === 'function') {
+        var btn = e.target.closest('.theme-switch [data-theme-mode]');
+        if (btn) setThemeMode(btn.dataset.themeMode);
+      }
     });
+    /* auto 模式实时跟随系统外观变化（不刷新页面也能切换） */
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onSystemChange = function () {
+        if (themeMode() === 'auto') applyResolvedTheme(resolveTheme(BlogUtils.config));
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+      else mq.addListener(onSystemChange);  /* 旧 Safari 兼容 */
+    }
+  }
+
+  /* 三段主题开关 HTML（桌面头部 / 移动抽屉共用，选中态由 updateThemeUI 同步） */
+  function themeSwitchHTML() {
+    return '<div class="theme-switch" role="group" aria-label="主题模式">' +
+      '<button type="button" data-theme-mode="auto">' + BlogUtils.icon('auto') + '</button>' +
+      '<button type="button" data-theme-mode="light">' + BlogUtils.icon('sun') + '</button>' +
+      '<button type="button" data-theme-mode="dark">' + BlogUtils.icon('moon') + '</button>' +
+    '</div>';
   }
 
   function renderHeader(config) {
@@ -253,7 +299,7 @@
               '<a href="' + ROOT + 'archives.html">归档</a>' +
               '<a href="' + ROOT + 'about.html">关于</a>' +
             '</nav>' +
-            '<button class="theme-toggle" type="button"></button>' +
+            themeSwitchHTML() +
             '<div class="site-search">' +
               '<input type="text" id="site-search-input" placeholder="搜索文章" autocomplete="off">' +
               '<button class="search-btn" type="button" aria-label="搜索">' + BlogUtils.icon('search') + '</button>' +
@@ -271,7 +317,8 @@
           '<a href="' + ROOT + 'archives.html">归档</a>' +
           '<a href="' + ROOT + 'about.html">关于</a>' +
         '</nav>' +
-        '<button class="theme-toggle theme-toggle-mobile" type="button"></button>' +
+        themeSwitchHTML() +
+        '<div class="theme-switch-hint">自动跟随系统 · 亮色 · 暗色</div>' +
         '<div class="mobile-search">' +
           '<input type="text" id="mobile-search-input" placeholder="搜索文章">' +
           '<button class="search-btn" type="button" aria-label="搜索">' + BlogUtils.icon('search') + '</button>' +
@@ -283,7 +330,7 @@
     highlightNav();
     bindSiteSearch();
     bindMobileDrawer();
-    updateThemeToggles(document.documentElement.dataset.theme);
+    updateThemeUI(themeMode());
     /* 导航项来自 pages.json 的页面列表（后台「页面管理」维护）：
        上面的三条默认链接是兜底，pages.json 读取成功后覆盖渲染 */
     renderNavFromPages();
@@ -853,10 +900,13 @@
     screenBG.list.forEach(function (state) {
       clearLayer(state);
       var resolved = applyLayer(state);
-      /* 壁纸主题联动（仅访客主动选择的壁纸；普通底色不打扰手动主题选择） */
+      /* 壁纸主题联动（仅访客主动选择的壁纸；普通底色不打扰手动主题选择）。
+         只在 auto 模式下生效，且只改「当前实际亮暗」不写偏好：
+         用户显式选了亮/暗色时壁纸无权覆盖，避免「切亮色还是暗色」 */
       if (resolved.type === 'wallpaper' && resolved.followTone && resolved.tone) {
-        if (document.documentElement.dataset.theme !== resolved.tone) {
-          setTheme(resolved.tone, true);
+        if (themeMode() === 'auto' &&
+            document.documentElement.dataset.theme !== resolved.tone) {
+          applyResolvedTheme(resolved.tone);
         }
       }
     });
@@ -870,8 +920,9 @@
       clearLayer(state);
       var resolved = applyLayer(state);
       if (resolved.type === 'wallpaper' && resolved.followTone && resolved.tone &&
+          themeMode() === 'auto' &&
           document.documentElement.dataset.theme !== resolved.tone) {
-        setTheme(resolved.tone, true);
+        applyResolvedTheme(resolved.tone);
       }
     });
   }
@@ -1094,11 +1145,10 @@
         if (localConfig) config = localConfig;
         BlogUtils.config = config;
 
-        /* 配置到达后校准主题（theme.dark 默认值在没有手动选择时生效），
-           再注入主题色，避免首屏闪一下默认蓝。
+        /* 配置到达后校准主题：按偏好模式解析实际亮暗，重新派生主题色，
+           避免首屏闪一下默认蓝；同时同步三段开关选中态。
            背景改由屏级背景系统在 apps.js 渲染完 ssb-page-rendered 后初始化 */
-        document.documentElement.dataset.theme = resolveTheme(config);
-        applyTheme(config);
+        applyResolvedTheme(resolveTheme(config));
 
         document.title = document.title.replace(/\s*-\s*My Blog\s*$/, '') +
           (document.title.indexOf(config.siteName) > -1 ? '' : ' - ' + config.siteName);

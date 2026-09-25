@@ -377,57 +377,6 @@
   padding-left: 10px;
 }
 
-/* ============================================================
-   左侧悬浮工具：目录开关 / 回到顶部
-   ============================================================ */
-.post-tools {
-  position: fixed;
-  left: 26px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  z-index: 90;
-}
-
-.post-tools button {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
-  color: var(--text-2);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .2s;
-}
-
-.post-tools button:hover {
-  color: var(--primary);
-  transform: scale(1.06);
-}
-
-.post-tools svg {
-  width: 20px;
-  height: 20px;
-}
-
-/* 回到顶部按钮：页面向下滚动后才显示 */
-#tool-top {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .25s;
-}
-
-#tool-top.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* 宽屏手动收起右侧目录 */
 body.toc-hidden .post-toc {
   display: none;
@@ -443,8 +392,9 @@ body.toc-hidden .post-layout {
 @media (max-width: 1000px) {
   .post-layout {
     grid-template-columns: minmax(0, 1fr);
-    /* 左侧给悬浮工具留出专门的槽位，避免压住正文 */
-    padding-left: 72px;
+    /* 左侧悬浮工具已并入右下角「⋯」菜单，不再预留槽位，
+       正文恢复正常边距（旧版 padding-left:72px 会把内容推向右） */
+    padding-left: 16px;
     padding-right: 16px;
   }
 
@@ -466,10 +416,6 @@ body.toc-hidden .post-layout {
 
   body.toc-open .post-toc {
     transform: translateX(0);
-  }
-
-  .post-tools {
-    left: 14px;
   }
 
   .post-title {
