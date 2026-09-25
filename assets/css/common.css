@@ -53,6 +53,22 @@ html[data-theme="dark"] {
   --shadow-md: 0 4px 18px rgba(0, 0, 0, .5);
 }
 
+/* ---------- 告诉浏览器/Android WebView：亮暗由网页自己管理，
+   禁止「算法强制变暗」（关键的移动端兼容） ----------
+   背景：部分手机浏览器（如 X浏览器内核）在系统暗色时会按
+   FORCE_DARK_AUTO 对网页整体压暗，无视 data-theme——
+   表现为「手机暗色系统下选亮色仍是暗色」，手动暗色还会被
+   二次压暗（旧反馈的「暗色会更暗」）。
+   规范允许作者显式拒绝：亮色态用 only light 声明；
+   暗色态声明 dark，浏览器直接采用本站暗色、不再叠加算法变暗。
+   旧内核不识别该声明时自动忽略，无副作用 */
+html {
+  color-scheme: only light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 /* ---------- 基础重置 ---------- */
 * {
   margin: 0;
