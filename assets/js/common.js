@@ -106,11 +106,13 @@
       try { return JSON.parse(raw); } catch (e) { return null; }
     },
 
-    /* 应用数据（search-engines/quotes/nav-links）统一入口：
+    /* 应用数据（data/ 目录下的 search-engines/quotes/nav-links 等）统一入口：
        始终优先读 localStorage 覆盖，没有再 fetch 仓库 JSON，
-       保证后台改完本地即刻生效 */
+       保证后台改完本地即刻生效。
+       LS 键只取文件名（不含 data/ 目录），与 admin.js 保持一致 */
     loadDataFile: function (filename) {
-      var data = this.readLocalJSON(this.LS_APP_PREFIX + filename.replace(/\.json$/, ''));
+      var base = filename.split('/').pop();
+      var data = this.readLocalJSON(this.LS_APP_PREFIX + base.replace(/\.json$/, ''));
       if (data !== null) return Promise.resolve(data);
       return this.fetchJSON(this.ROOT + filename);
     },
@@ -142,7 +144,7 @@
     getPosts: function () {
       if (!this._postsPromise) {
         var self = this;
-        this._postsPromise = this.fetchJSON(ROOT + 'posts-list.json')
+        this._postsPromise = this.fetchJSON(ROOT + 'data/posts-list.json')
           .then(function (list) {
             var localMap = {};
             self.getLocalPosts().forEach(function (p) { localMap[p.file] = p; });
@@ -296,8 +298,8 @@
           '<div class="header-right">' +
             '<nav class="site-nav" id="site-nav">' +
               '<a href="' + ROOT + 'index.html">首页</a>' +
-              '<a href="' + ROOT + 'archives.html">归档</a>' +
-              '<a href="' + ROOT + 'about.html">关于</a>' +
+              '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
+              '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
             '</nav>' +
             themeSwitchHTML() +
             '<div class="site-search">' +
@@ -314,8 +316,8 @@
       '<div class="mobile-drawer" id="mobile-drawer">' +
         '<nav class="mobile-nav" id="mobile-nav">' +
           '<a href="' + ROOT + 'index.html">首页</a>' +
-          '<a href="' + ROOT + 'archives.html">归档</a>' +
-          '<a href="' + ROOT + 'about.html">关于</a>' +
+          '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
+          '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
         '</nav>' +
         themeSwitchHTML() +
         '<div class="theme-switch-hint">自动跟随系统 · 亮色 · 暗色</div>' +
@@ -337,11 +339,11 @@
   }
 
   /* ---------- 导航项渲染：读 pages.json 的 pages 数组 ----------
-     每个页面一个导航项，顺序即页面数组顺序（「归档调成首页」等
-     结构变化在这里自然生效）。页面 file 为空（本地新建页）时
-     跳 page.html?slug= 动态渲染。读取失败保持默认兜底链接 */
+     每个页面一个导航项，顺序即页面数组顺序（落地页锚定首位）。
+     落地页 file=index.html；其余页面 file 一律为空，跳
+     page.html?slug= 动态渲染。读取失败保持默认兜底链接 */
   function renderNavFromPages() {
-    BlogUtils.loadDataFile('pages.json').then(function (data) {
+    BlogUtils.loadDataFile('data/pages.json').then(function (data) {
       if (!data || !Array.isArray(data.pages) || !data.pages.length) return;
 
       var linksHTML = data.pages.map(function (p) {
@@ -709,7 +711,7 @@
        { mode:'default'|'particles'|'wallpaper', file?:具体壁纸,
          followTone?:bool }
        mode 非 default 时覆盖所有屏；壁纸选中后可按 tone 自动切主题。
-     壁纸清单来自 wallpapers.json，图床加载失败回退普通底色。
+     壁纸清单来自 data/wallpapers.json，图床加载失败回退普通底色。
      多个粒子层用 IntersectionObserver 按可见性暂停动画，节省 CPU。
      ============================================================ */
   var BG_PREF_KEY = 'ssb.bg-pref';
@@ -739,7 +741,7 @@
   var wallpapersPromise = null;
   function loadWallpapers() {
     if (wallpapersPromise) return wallpapersPromise;
-    wallpapersPromise = BlogUtils.loadDataFile('wallpapers.json')
+    wallpapersPromise = BlogUtils.loadDataFile('data/wallpapers.json')
       .then(function (data) {
         screenBG.wallpapers = (data && Array.isArray(data.wallpapers)) ? data.wallpapers : [];
         return screenBG.wallpapers;
@@ -1156,7 +1158,7 @@
         renderHeader(config);
         renderFooter(config);
 
-        /* 通知其他脚本 config 已就绪（如 about.html 的邮箱填充） */
+        /* 通知其他脚本 config 已就绪（如关于页的邮箱填充） */
         document.dispatchEvent(new CustomEvent('ssb-config-ready'));
 
         /* 各页面自己的初始化钩子（apps.js / post.js 通过 window.initPage 注册） */

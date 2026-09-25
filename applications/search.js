@@ -1,6 +1,6 @@
 /* ============================================================
    SSB 应用：外站搜索框（search）
-   数据文件：search-engines.json（{name, url 前缀} 数组）
+   数据文件：data/search-engines.json（{name, url 前缀} 数组）
    引擎选择存 localStorage（多实例共享同一选择）；
    favicon 加载失败回退首字母。所有 DOM 操作按 box 作用域，支持多实例
    ============================================================ */
@@ -14,7 +14,7 @@
     name: '外站搜索框',
     desc: '可选搜索引擎的大号搜索框，回车/点击新标签页打开结果',
     hero: true,
-    dataFile: 'search-engines.json',
+    dataFile: 'data/search-engines.json',
     configSchema: [],
     css: `
 :root {
@@ -184,7 +184,7 @@
       box.className = 'big-search';
       mount.appendChild(box);
 
-      return U.loadDataFile('search-engines.json')
+      return U.loadDataFile('data/search-engines.json')
         .then(function (list) {
           engines = list || [];
           if (!engines.length) return;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区 - My Blog</title>
-  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <!-- 文章元数据，请勿手工修改此 script -->
   <script type="application/json" class="post-data">
   {
     "title": "毛玻璃导航盒子实现笔记：backdrop-filter 与滚轮分区",
@@ -59,7 +59,7 @@
         <p>因为毛玻璃盒子直接做在 <code>#nav-zone</code> 元素本身（加 padding、背景、边框），而不是外面再包一层 div，事件冒泡的目标不变，<code>closest</code> 的命中范围和盒子的视觉范围天然重合。样式改动零 JS 侵入——这其实是当初把容器 id 留在最外层的回报。</p>
 
         <h2>参数可配</h2>
-        <p>透明度和模糊强度是很主观的东西，所以抽成了 <code>site-config.json</code> 的 <code>navPanel</code> 节点：<code>enable</code> 一键关闭盒子、<code>opacity</code> 控制白底浓度、<code>blur</code> 控制雾化强度。JS 只负责把参数写成 CSS 变量注入，样式细节仍然收敛在 CSS 一处。</p>
+        <p>透明度和模糊强度是很主观的东西，所以抽成了 <code>data/pages.json</code> 里 <code>apps.nav.panel</code> 节点（后台「应用管理」即可调整）：<code>enable</code> 一键关闭盒子、<code>opacity</code> 控制白底浓度、<code>blur</code> 控制雾化强度。JS 只负责把参数写成 CSS 变量注入，样式细节仍然收敛在 CSS 一处。</p>
 
         <h2>降级与无障碍：玻璃不是刚需</h2>
         <p><code>backdrop-filter</code> 在较老的浏览器（以及某些系统的「减少透明度」辅助设置下）会直接失效。此时半透明白底仍然在，最坏情况是「看得更透一点」，不至于内容不可读——这是选 55% 而不是 15% 白底的另一个原因：<strong>模糊失效时，底色自己也得撑得住可读性</strong>。</p>

@@ -70,8 +70,6 @@ const siteDesc = String(siteConfig.description || '').trim();
 /* 页面标题：文件名 → 完整 title */
 const PAGE_TITLES = {
   'index.html': siteName,
-  'archives.html': '归档 - ' + siteName,
-  'about.html': '关于 - ' + siteName,
   'page.html': siteName,
   '404.html': '404 - 页面走丢了'
 };
@@ -117,8 +115,9 @@ async function build() {
     );
   }
 
-  /* 1. 根目录外壳页（压缩 + 标题/描述注入） */
-  ['index.html', 'archives.html', 'about.html', 'page.html', '404.html'].forEach((n) => addHtml(n));
+  /* 1. 根目录外壳页（压缩 + 标题/描述注入）：
+     index=落地页，page=所有动态页共用的渲染器，404=GitHub Pages 约定 */
+  ['index.html', 'page.html', '404.html'].forEach((n) => addHtml(n));
 
   /* 2. 后台页面（压缩；不注入站点标题） */
   tasks.push(
@@ -178,12 +177,14 @@ async function build() {
   copyFile(path.join(ROOT, 'assets/favicon.svg'), path.join(DIST, 'assets/favicon.svg'));
   console.log('  copy  ', 'assets/favicon.svg');
 
-  /* 8. 根目录数据 JSON 全部原样复制（保留可读格式与 _comment 字段） */
-  for (const name of fs.readdirSync(ROOT)) {
-    if (name.endsWith('.json')) {
-      copyFile(path.join(ROOT, name), path.join(DIST, name));
-      console.log('  copy  ', name);
-    }
+  /* 8. 数据文件：根目录只保留 site-config.json，其余数据 JSON 都在 data/，
+        全部原样复制（保留可读格式与 _comment 字段）。
+        注意：根目录 package.json 是构建工具配置，不部署 */
+  copyFile(path.join(ROOT, 'site-config.json'), path.join(DIST, 'site-config.json'));
+  console.log('  copy  ', 'site-config.json');
+  for (const name of walk('data')) {
+    copyFile(path.join(ROOT, 'data', name), path.join(DIST, 'data', name));
+    console.log('  copy  ', 'data/' + name);
   }
 
   /* 9. robots.txt 原样复制 */

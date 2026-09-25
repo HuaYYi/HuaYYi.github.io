@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>浏览器里的数据库：localStorage 使用心得与陷阱 - My Blog</title>
-  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <!-- 文章元数据，请勿手工修改此 script -->
   <script type="application/json" class="post-data">
   {
     "title": "浏览器里的数据库：localStorage 使用心得与陷阱",
@@ -84,7 +84,7 @@ for (var i = localStorage.length - 1; i >= 0; i--) {
     refreshPostList();   // e.newValue 就是新值，免一次读取
   }
 });</code></pre>
-        <p>本站后台写文章、前台列表开着的场景，靠这个事件就能做到「后台一保存，前台自动出现」，不需要轮询。</p>
+        <p>一个标签页写内容、另一个标签页开着列表的场景，靠这个事件就能做到「一处保存，另一处自动出现」，不需要轮询。</p>
 
         <h2>三兄弟怎么选</h2>
         <table>

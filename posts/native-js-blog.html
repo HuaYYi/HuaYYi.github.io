@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>零框架博客是怎么炼成的：Self Static Blog 架构笔记 - My Blog</title>
-  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->
+  <!-- 文章元数据，请勿手工修改此 script -->
   <script type="application/json" class="post-data">
   {
     "title": "零框架博客是怎么炼成的：Self Static Blog 架构笔记",
@@ -34,30 +34,30 @@
         </figure>
 
         <h2>为什么不用框架</h2>
-        <p>先看需求：一个首页（搜索框 + 网址导航 + 文章列表）、归档页、关于页、文章详情页，再加一个浏览器里跑的写作后台。页面总数不到 10 个，交互以「渲染 JSON 数据」为主，没有复杂的状态流转。</p>
+        <p>先看需求：一个首页（搜索框 + 网址导航 + 文章列表）、归档页、关于页、文章详情页。页面总数不到 10 个，交互以「渲染 JSON 数据」为主，没有复杂的状态流转。</p>
         <p>框架解决的核心问题是「状态与视图的同步」。当页面上有大量动态状态互相影响时，框架的声明式渲染能救命；但当你的状态少到可以用几个全局变量说清楚时，引入框架带来的是构建链、依赖升级、概念负担，收益却很小。对于部署在 GitHub Pages、希望「克隆下来就能跑」的静态博客，零依赖就是最大的功能。</p>
 
         <h2>JSON 驱动：内容与代码分离</h2>
-        <p>整站的可变内容全部抽成了顶层 JSON 文件，改配置不需要碰任何 JS：</p>
+        <p>整站的可变内容全部抽成了 JSON 文件，改配置不需要碰任何 JS。站点配置留在根目录，其余数据统一收在 <code>data/</code>：</p>
         <ul>
           <li><code>site-config.json</code>：站名、主题色、背景动画参数、本地模式开关</li>
-          <li><code>search-engines.json</code>：首页大搜索框的引擎列表</li>
-          <li><code>nav-links.json</code>：网址导航的分类与链接</li>
-          <li><code>quotes.json</code>：随机名言</li>
-          <li><code>posts-list.json</code>：文章元数据（标题、日期、摘要、分类）</li>
+          <li><code>data/search-engines.json</code>：首页大搜索框的引擎列表</li>
+          <li><code>data/nav-links.json</code>：网址导航的分类与链接</li>
+          <li><code>data/quotes.json</code>：随机名言</li>
+          <li><code>data/posts-list.json</code>：文章元数据（标题、日期、摘要、分类）</li>
         </ul>
         <p>页面脚本的启动流程是统一的：<code>common.js</code> 读完站点配置，注入主题色 CSS 变量、渲染头部页脚，然后广播一个 <code>ssb-config-ready</code> 事件，各页面自己的 <code>initPage(config)</code> 再接管剩下的渲染。这样每个页面脚本只关心自己的板块，公共逻辑收敛在一处。</p>
 
-        <h2>本地模式：没有后端的「后台」</h2>
-        <p>静态站没有数据库，写作后台怎么存数据？答案是双轨：</p>
+        <h2>数据存哪里：本地与线上双轨</h2>
+        <p>静态站没有数据库，数据怎么存？答案是双轨：</p>
         <ul>
           <li><strong>本地模式</strong>：文章元数据和正文直接存进浏览器的 localStorage（列表一个键、正文每个文件一个键），不访问网络、不需要任何令牌，适合离线写作和预览；</li>
           <li><strong>线上模式</strong>：通过 GitHub Contents API 把文章以 commit 的形式提交到仓库，仓库再触发 Actions 构建发布。</li>
         </ul>
-        <p>两种模式下，读文章的代码是同一套：<code>getPosts()</code> 先拉仓库里的 <code>posts-list.json</code>，本地模式再并入 localStorage 里的文章。对前台来说，文章来自 GitHub 还是来自浏览器，没有任何区别。</p>
+        <p>两种模式下，读文章的代码是同一套：<code>getPosts()</code> 先拉仓库里的 <code>data/posts-list.json</code>，本地模式再并入 localStorage 里的文章。对前台来说，文章来自 GitHub 还是来自浏览器，没有任何区别。</p>
 
         <h2>构建与部署</h2>
-        <p>开发版代码带大量注释、保持可读；上线前由 <code>build.mjs</code> 压缩进 <code>dist/</code>：HTML 去注释折叠空白、CSS 用 clean-css、JS 用 terser。唯一原样拷贝的是 <code>posts/*.html</code>——文章正文不做任何转换，保证后台读到的和仓库里存的是同一份字节。</p>
+        <p>开发版代码带大量注释、保持可读；上线前由 <code>build.mjs</code> 压缩进 <code>dist/</code>：HTML 去注释折叠空白、CSS 用 clean-css、JS 用 terser。唯一原样拷贝的是 <code>posts/*.html</code>——文章正文不做任何转换，保证读到的和仓库里存的是同一份字节。</p>
 
         <h2>踩过的坑</h2>
         <ul>
@@ -67,7 +67,7 @@
         </ul>
 
         <h2>没有框架，「组件化」怎么办</h2>
-        <p>原生 JS 里同样可以有组件思维，关键是划清边界。这个项目的做法是：<strong>一个板块 = 一个渲染函数 + 一份数据 + 一段作用域 CSS</strong>。比如网址导航：数据来自 <code>nav-links.json</code>，渲染只发生在 <code>#nav-zone</code> 内部，类名统一以 <code>nav-</code> 开头防冲突。函数执行完，DOM 已就位，事件委托挂在容器上，没有虚拟 DOM、没有 diff，但「数据变了就重渲染这块」的效果是一样的。</p>
+        <p>原生 JS 里同样可以有组件思维，关键是划清边界。这个项目的做法是：<strong>一个板块 = 一个渲染函数 + 一份数据 + 一段作用域 CSS</strong>。比如网址导航：数据来自 <code>data/nav-links.json</code>，渲染只发生在 <code>#nav-zone</code> 内部，类名统一以 <code>nav-</code> 开头防冲突。函数执行完，DOM 已就位，事件委托挂在容器上，没有虚拟 DOM、没有 diff，但「数据变了就重渲染这块」的效果是一样的。</p>
         <p>状态管理也极简：当前 tab、当前页码、当前搜索引擎，各用一个模块内变量保存，翻页函数是唯一的修改入口。状态少、入口唯一，就不需要库来帮你追踪变化。</p>
 
         <h2>性能与体积：白手起家的红利</h2>

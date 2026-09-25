@@ -6,10 +6,10 @@
        id, name, desc, hero, dataFile, configSchema, css, render
      })
      - render(mount, ctx)：mount=挂载点 DOM；ctx.cfg=配置（schema 默认
-       ∪ pages.json 的 apps[id] ∪ 实例 cfg 三层合并）；返回 false
+       ∪ data/pages.json 的 apps[id] ∪ 实例 cfg 三层合并）；返回 false
        表示无内容（引擎自动移除挂载壳）；可返回 Promise 或销毁函数
      - 依赖注入：函数内可直接用 BlogUtils（别名 U），无需 import
-     - 仓库文件即唯一基线：可在后台「应用管理」直接编辑，本地模式
+     - 仓库文件即唯一基线：本地模式
        下改坏了可一键丢弃本浏览器修改、恢复为仓库版本
    ============================================================ */
 SSBApps.define({
@@ -49,9 +49,8 @@ SSBApps.define({
 }
 `,
   render: function (mount, ctx) {
-    /* 兼容旧版：文字原存 site-config.json 的 heroNotice 字段 */
-    var text = ctx.cfg.text != null ? ctx.cfg.text
-      : ((U.config && U.config.heroNotice) || '');
+    /* 公告文字：应用参数表单维护（留空=隐藏） */
+    var text = ctx.cfg.text != null ? ctx.cfg.text : '';
     text = String(text).trim();
     if (!text) return false;   /* 没文字不渲染（留空则隐藏） */
     mount.innerHTML = '<h1 class="hero-notice"><span class="notice-bar"></span>' +

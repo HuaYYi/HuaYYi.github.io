@@ -1,6 +1,6 @@
 /* ============================================================
    SSB 应用：文章列表（posts）
-   cfg = schema 默认 ∪ pages.json 的 apps.posts ∪ 实例 cfg（三层合并）
+   cfg = schema 默认 ∪ data/pages.json 的 apps.posts ∪ 实例 cfg（三层合并）
    title=板块标题（缺省「最新文章」，通常在实例上配）/ count=篇数(0全部)
    summary / cover / order=newest|oldest / category=只显示某分类
    可重复添加：首页「最新文章」+ 另一个屏「随笔分类文章」互不影响
@@ -146,7 +146,7 @@ SSBApps.define({
         list = list.slice(0, count);
 
         if (!list.length) {
-          listEl.innerHTML = '<p class="list-empty">还没有文章，去后台写第一篇吧。</p>';
+          listEl.innerHTML = '<p class="list-empty">还没有文章。</p>';
           return;
         }
 
@@ -176,7 +176,7 @@ SSBApps.define({
       })
       .catch(function (err) {
         console.error(err);
-        listEl.innerHTML = '<p class="list-empty">文章列表加载失败：posts-list.json</p>';
+        listEl.innerHTML = '<p class="list-empty">文章列表加载失败：data/posts-list.json</p>';
       });
   }
 });

@@ -16,7 +16,7 @@
      调用，声明 name/hero/configSchema/css/render；清单在
      applications/applications.json（内置/自定义、数据文件路由）。
      - 仓库文件 applications/<id>.js 即唯一基线；本地模式可丢弃浏览器修改恢复它
-     - 应用代码可在后台「应用管理」直接编辑；本地模式编辑结果存
+     - 应用代码的本地覆盖存
        localStorage（ssb.local.app.appcode.<id>），线上模式提交到仓库
      - 加载逐个隔离：单个应用代码语法/执行错误只影响它自己（进错误
        清单，不进注册表），其余应用照常注册渲染
@@ -37,7 +37,7 @@
 
   var U = window.BlogUtils;
 
-  /* 各模板单屏（未加屏）时盒子的默认宽度，迁移旧数据 / 兜底数据使用 */
+  /* 各模板单屏（未加屏）时盒子的默认宽度，兜底数据使用 */
   var DEFAULT_BOX_WIDTH = { landing: '1000px', list: '760px', content: '740px' };
 
   /* ============================================================
@@ -121,7 +121,7 @@
       });
   }
 
-  /* 应用代码来源：始终优先 localStorage 覆盖（后台编辑保存后即时生效），
+  /* 应用代码来源：始终优先 localStorage 覆盖（保存后即时生效），
      没有覆盖再 fetch applications/<id>.js（no-cache，改完强刷即生效） */
   function fetchAppCode(id) {
     try {
@@ -154,7 +154,7 @@
     }
   }
 
-  /* 读取应用代码原文（后台编辑器用，不经过注册表）：
+  /* 读取应用代码原文（不经过注册表）：
      与 fetchAppCode 同路径，但不依赖 initPage 流程 */
   function readAppCode(id) {
     try {
@@ -212,7 +212,7 @@
     return base;
   }
 
-  /* pages.json 缺失 / 为 v1 旧结构 / 加载失败时的兜底（v3 形态） */
+  /* pages.json 缺失 / 加载失败时的兜底（v3 形态） */
   var DEFAULT_DATA = {
     responsive: { templates: [] },
     apps: {
@@ -238,7 +238,7 @@
         ]
       },
       {
-        id: 'archives', title: '归档', template: 'list', file: 'archives.html',
+        id: 'archives', title: '归档', template: 'list', file: '',
         screens: [
           { bg: { type: 'none' }, vAlign: 'start', boxes: [
             { width: '760px', hAlign: 'center', apps: [
@@ -248,12 +248,12 @@
         ]
       },
       {
-        id: 'about', title: '关于', template: 'content', file: 'about.html',
+        id: 'about', title: '关于', template: 'content', file: '',
         screens: [
           { bg: { type: 'none' }, vAlign: 'start', boxes: [
             { width: '740px', hAlign: 'center', apps: [
               { uid: 'f1', id: 'rich-content', enable: true, align: 'left',
-                cfg: { html: '<p>关于页暂无内容，请到后台「页面管理」中编辑。</p>' } }
+                cfg: { html: '<p>关于页暂无内容。</p>' } }
             ] }
           ] }
         ]
@@ -261,16 +261,9 @@
     ]
   };
 
-  /* ============================================================
-     v2 → v3 迁移（localStorage 可能残留旧版数据，必须就地兼容）
-     v2 形态：page.apps[{id,enable}]，landing 按注册表 zone 分 hero/below；
-     about-content 全局单例 → 第一个 rich-content 实例
-     ============================================================ */
+  /* uid 生成：v3 数据里实例缺失 uid 时就地补齐 */
   var uidSeq = 0;
   function genUID() { uidSeq += 1; return 'u' + Date.now().toString(36) + uidSeq; }
-
-  /* hero 类（首屏默认居中）以注册表定义为准，不再硬编码 id 清单 */
-  function isHeroApp(id) { return !!(registry[id] && registry[id].hero); }
 
   /* ============================================================
      响应式模板库（v3.1）：模板按层级分类（screen|box|app），
@@ -363,16 +356,17 @@
     return templates;
   }
 
+  /* v3 数据清洗（每次渲染前就地执行）：
+     bg 取值收敛、响应式挂载清洗、布局数值夹取、实例 uid 补齐。
+     已不再兼容 v1/v2 旧结构——异常数据（无 pages/无 screens）
+     分别回落内置兜底与空屏 */
   function normalizeV3(data) {
     if (!data || !Array.isArray(data.pages)) return DEFAULT_DATA;
-    var globalApps = data.apps || {};
-    var aboutHTML = globalApps['about-content'] && globalApps['about-content'].content;
     var tplLib = normalizeResponsive(data);
 
     data.pages.forEach(function (page) {
       if (Array.isArray(page.screens) && page.screens.length) {
-        /* v3/v3.1：补齐缺失的 uid；旧版 default（跟随站点背景）统一归一为 none，
-           需要背景的屏由 pages.json 显式写 particles/wallpaper；
+        /* 需要背景的屏由 pages.json 显式写 particles/wallpaper；
            响应式挂载与基础布局数值就地清洗 */
         page.screens.forEach(function (sc) {
           normalizeScreenBg(sc);
@@ -393,57 +387,18 @@
         return;
       }
 
-      /* v2 → v3 分流 */
+      /* 无 screens 的异常/陈旧数据：给一空屏，渲染端与后台表现一致 */
       var tpl = page.template === 'list' || page.template === 'content' ? page.template : 'landing';
-      var heroInsts = [];
-      var belowInsts = [];
-
-      (page.apps || []).forEach(function (inst) {
-        var id = inst.id;
-        if (id === 'about-content') id = 'rich-content';   /* 旧单例更名 */
-        var migrated = {
-          uid: genUID(), id: id,
-          enable: inst.enable !== false,
-          align: isHeroApp(id) ? 'center' : 'left'
-        };
-        if (id === 'rich-content') migrated.cfg = { html: aboutHTML || '' };
-        if (isHeroApp(id)) heroInsts.push(migrated);
-        else belowInsts.push(migrated);
-      });
-
-      var screens = [];
-      if (tpl === 'landing') {
-        /* v2 首页第一屏沿用旧版站点粒子背景的视觉，显式写 particles */
-        if (heroInsts.length) {
-          screens.push({ bg: { type: 'particles' }, vAlign: 'center', boxes: [
-            { width: '1000px', hAlign: 'center', apps: heroInsts }
-          ] });
-        }
-        if (belowInsts.length) {
-          screens.push({ bg: { type: 'none' }, vAlign: 'start', boxes: [
-            { width: '760px', hAlign: 'center', apps: belowInsts }
-          ] });
-        }
-      } else {
-        var all = heroInsts.concat(belowInsts);
-        if (all.length) {
-          screens.push({ bg: { type: 'none' }, vAlign: 'start', boxes: [
-            { width: DEFAULT_BOX_WIDTH[tpl], hAlign: 'center', apps: all }
-          ] });
-        }
-      }
-      page.screens = screens.length ? screens : makeEmptyScreen(tpl);
+      page.screens = [makeEmptyScreen(tpl)];
       delete page.apps;
     });
 
-    /* 顶层全局配置移除已下线的 about-content */
-    if (data.apps && data.apps['about-content']) delete data.apps['about-content'];
     return data;
   }
 
   /* 屏背景只允许 none|particles|wallpaper：
      none=不渲染背景层（最省资源，访客右键菜单也不出现背景组）；
-     旧值 default/缺失/非法一律归一为 none，壁纸必须保留 file */
+     缺失/非法一律归一为 none，壁纸必须保留 file */
   function normalizeScreenBg(sc) {
     var t = sc.bg && sc.bg.type;
     if (t === 'particles') { sc.bg = { type: 'particles' }; return; }
@@ -595,7 +550,7 @@
             ghost.className = 'app app-missing';
             ghost.dataset.uid = inst.uid || '';
             ghost.innerHTML = '<div class="app-error"><b>应用「' + U.escapeHTML(inst.id) +
-              '」未加载</b><span>代码文件缺失或注册失败，可到后台「应用管理」检查</span></div>';
+              '」未加载</b><span>代码文件缺失或注册失败</span></div>';
             boxEl.appendChild(ghost);
             return;
           }
@@ -707,7 +662,6 @@
       '<div class="app-error">' +
         '<b>应用「' + U.escapeHTML(def.name) + '」渲染失败</b>' +
         '<code>' + U.escapeHTML(err && err.message ? err.message : String(err)) + '</code>' +
-        '<span>可到后台「应用管理」检查代码或恢复仓库版本</span>' +
       '</div>';
   }
 
@@ -737,14 +691,14 @@
      单个失败不阻塞整体（未注册的实例渲染时显示缺失占位） */
   window.initPage = function (siteConfig) {
     loadApplications()
-      .then(function () { return U.loadDataFile('pages.json'); })
+      .then(function () { return U.loadDataFile('data/pages.json'); })
       .then(function (data) {
         renderPage(data && Array.isArray(data.pages) ? data : DEFAULT_DATA, siteConfig);
       })
       .catch(function () { renderPage(DEFAULT_DATA, siteConfig); });
   };
 
-  /* 对外工具：admin / 其他脚本复用 */
+  /* 对外工具接口（其他脚本复用） */
   window.SSBApps = {
     define: define,
     register: define,           /* 别名，语义等价 */
@@ -759,7 +713,7 @@
     getPath: getPath,
     setPath: setPath,
     normalizeV3: normalizeV3,
-    /* admin 复用：响应式规则清洗 + 层级/属性元数据（构造模板与自定义规则编辑器） */
+    /* 响应式规则清洗 + 层级/属性元数据（构造模板与自定义规则编辑器） */
     sanitizeRule: sanitizeRule,
     respMeta: { levels: RESP_LEVELS, props: RESP_PROPS },
     /* screen-scroll.js 在导航板块内滚动滚轮时调用：翻该实例自己的页 */

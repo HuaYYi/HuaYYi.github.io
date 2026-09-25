@@ -47,13 +47,9 @@
   var LS_SITE_KEY = 'ssb.local.site-config';
   var LS_APP_PREFIX = 'ssb.local.app.';
 
-  /* 站点设置页管理的四个数据文件（整页保存时按是否改动决定提交哪些） */
-  var SITE_FILES = {
-    config: 'site-config.json',
-    engines: 'search-engines.json',
-    quotes: 'quotes.json',
-    nav: 'nav-links.json'
-  };
+  /* 站点设置只管理 site-config.json；
+     首页三个应用的数据（search-engines/quotes/nav-links）归「应用管理」 */
+  var SITE_CONFIG_FILE = 'site-config.json';
   var SAVE_TEXT = '保存到本地';   /* 保存失败时按钮恢复的统一文案 */
 
   /* DOM 快捷方式 */
@@ -129,7 +125,7 @@
   function writeLocalList(list) {
     localStorage.setItem(LS_LIST_KEY, JSON.stringify(list, null, 2));
     /* 登记待提交（面板会与仓库列表对比，无差异自动剔除） */
-    pendingMark('posts-list.json', '文章列表（新增 / 删除）', '文章');
+    pendingMark('data/posts-list.json', '文章列表（新增 / 删除）', '文章');
     commitLoaded = false;
   }
 
@@ -145,9 +141,11 @@
      始终优先读 localStorage 覆盖，没有再走 readRepoFile
      （GitHub API 最新 → 同源静态文件兜底） */
   function readDataFile(filename) {
-    var key = filename === SITE_FILES.config
+    /* LS 键只取文件名（data/ 目录不进键名），与前台 loadDataFile 约定一致 */
+    var base = filename === SITE_CONFIG_FILE ? filename : filename.split('/').pop();
+    var key = filename === SITE_CONFIG_FILE
       ? LS_SITE_KEY
-      : LS_APP_PREFIX + filename.replace(/\.json$/, '');
+      : LS_APP_PREFIX + base.replace(/\.json$/, '');
     var local = readLocalJSON(key);
     if (local !== null) return Promise.resolve(local);
     return readRepoFile(filename).then(function (f) {
@@ -309,7 +307,7 @@
       : VIEW_TITLES[name] || '';
     /* 首次进入数据视图时加载表单数据，之后保留用户未保存的编辑
        （保存成功后会互相置 false：站点设置/应用管理共用 site-config.json，
-        页面管理/应用管理共用 pages.json，避免快照过期互相覆盖） */
+        页面管理/应用管理共用 data/pages.json，避免快照过期互相覆盖） */
     if (name === 'site' && !siteLoaded) loadSiteSettings();
     if (name === 'pages' && !pagesLoaded) loadPagesData();
     if (name === 'apps' && !appsLoaded) loadAppsData();
@@ -325,11 +323,11 @@
     var tbody = $('posts-tbody');
     tbody.innerHTML = '<tr><td colspan="4" class="table-loading">加载中…</td></tr>';
 
-    readRepoFile('posts-list.json').then(function (file) {
+    readRepoFile('data/posts-list.json').then(function (file) {
       var list = [];
       if (file) {
         try { list = JSON.parse(file.text); } catch (e) {
-          throw new Error('posts-list.json 解析失败：' + e.message);
+          throw new Error('data/posts-list.json 解析失败：' + e.message);
         }
       }
       repoPostsCache = list.slice();   /* 本地合并前的仓库基线 */
@@ -911,7 +909,7 @@
 '  <title>' + escapeHTML(meta.title) + ' - ' + escapeHTML(config.siteName) + '</title>\n' +
 '  <meta name="description" content="' + escapeHTML(meta.title) + '">\n' +
 '  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">\n' +
-'  <!-- 文章元数据：后台保存时自动写入，请勿手工修改此 script -->\n' +
+'  <!-- 文章元数据，请勿手工修改此 script -->\n' +
 '  <script type="application/json" class="post-data">\n' +
 '  ' + data + '\n' +
 '  <\/script>\n' +
@@ -938,31 +936,31 @@
 
   /* ============================================================
      站点设置（表单 UI）
-     管理 site-config.json + search-engines / quotes / nav-links 三个首页应用。
+     只管理 site-config.json；首页应用的参数与数据在「应用管理」。
      保存只写入 localStorage 覆盖键并登记待提交，前台读取时优先使用；
      统一到「提交管理」里向 GitHub 提交
      ============================================================ */
   var siteLoaded = false;
   var siteData = null;   /* 最近一次加载的快照（保存成功后同步），用于差异比较 */
 
-  /* 页面管理（pages.json）状态：完全复用站点设置的「快照 + 差异保存」模式。
+  /* 页面管理（data/pages.json）状态：完全复用站点设置的「快照 + 差异保存」模式。
      本地覆盖键自动遵循 readDataFile 的推导规则 → ssb.local.app.pages。
      pagesData 是文件快照（保存时深拷贝以保留 _comment 等表外字段）；
      pagesWork 是页面卡片的工作副本（结构性操作先从 DOM 同步文本，再改这里后重渲染） */
   var pagesLoaded = false;
   var pagesData = null;
   var pagesWork = null;
-  /* v3：当前正在编辑的页下标（-1 = 停留在列表视图）；壁纸选项来自 wallpapers.json */
+  /* v3：当前正在编辑的页下标（-1 = 停留在列表视图）；壁纸选项来自 data/wallpapers.json */
   var editIndex = -1;
   var wallpaperOptions = [];
-  /* v3.1 响应式模板库（pages.json 顶层 responsive）：respWork 为工作副本随页面一起保存；
+  /* v3.1 响应式模板库（data/pages.json 顶层 responsive）：respWork 为工作副本随页面一起保存；
      respEdit = null | {mode:'new'|'edit', idx} 表示模板编辑器展开中 */
   var respWork = null;
   var respEdit = null;
 
   /* 应用管理状态：appsLoaded 控制首次进入视图时加载（快照 appsData 的
      声明与加载逻辑在文末「应用管理 v3.5」大段）。
-     与「页面管理」共用 pages.json，任一视图保存成功后都会把对方
+     与「页面管理」共用 data/pages.json，任一视图保存成功后都会把对方
      loaded 置 false 强制重载，防止快照互相覆盖 */
   var appsLoaded = false;
 
@@ -1111,7 +1109,7 @@
 
     /* 站点设置瘦身后只管 site-config.json；
        引擎/名言/导航数据由「应用管理」负责 */
-    readDataFile(SITE_FILES.config).then(function (cfg) {
+    readDataFile(SITE_CONFIG_FILE).then(function (cfg) {
       siteData = { config: cfg || {} };
       siteLoaded = true;
       fillSiteForm(siteData);
@@ -1304,7 +1302,7 @@
 
     try {
       localStorage.setItem(LS_SITE_KEY, JSON.stringify(data.config, null, 2));
-      pendingMark(SITE_FILES.config, '站点配置', '站点配置');
+      pendingMark(SITE_CONFIG_FILE, '站点配置', '站点配置');
     } catch (e) {
       btn.disabled = false;
       btn.textContent = '保存设置';
@@ -1319,23 +1317,15 @@
     btn.textContent = '保存设置';
     showSiteMsg('已保存到本浏览器，刷新前台即可看到效果', false);
     toast('站点设置已保存');
-    /* site-config.json 同时被「应用管理」编辑（heroNotice 等字段），
-       保存后使其快照失效，下次进入重新加载 */
-    appsLoaded = false;
   }
 
   /* ============================================================
-     页面管理（pages.json v2）：页面 = 容器（模板/标题/挂载应用排序开关），
-     应用 = 积木（数据与配置在「应用管理」中维护）。
-     加载/保存模式与站点设置一致：本地写 localStorage 覆盖键，
-     线上走 Git Trees 提交（pages.json + 新建页面的静态 HTML）
-     ============================================================ */
-
-  /* ============================================================
      页面管理 v3：页面列表 + 单页编辑（屏 screen → 盒子 box → 板块实例 app）
-     数据结构见 apps.js 顶部心智模型。v2→v3 迁移直接复用
-     window.SSBApps.normalizeV3（admin/index.html 已引入 apps.js），
-     后台不重复实现迁移，避免两份逻辑日后漂移
+     页面 = 容器（模板/标题/挂载应用），应用 = 积木（数据与配置在
+     「应用管理」中维护）。数据结构见 apps.js 顶部心智模型；加载时
+     统一过 window.SSBApps.normalizeV3 清洗，后台不重复实现。
+     加载/保存模式与站点设置一致：本地写 localStorage 覆盖键，
+     线上走 Git Trees 提交（data/pages.json + 新建页面的静态 HTML）
      ============================================================ */
 
   /* 板块元数据 v3.5：不再硬编码，改由「应用清单 + 应用代码 define」
@@ -1343,11 +1333,11 @@
      init 拿到站点配置后预载，应用列表与页面管理的「添加板块」下拉共用。
      hero 类在新建实例时默认居中对齐；同类板块可重复挂载，靠 uid 区分 */
 
-  /* 内置页面：仓库自带静态文件，标识/模板/文件名锁定，不允许删除 */
-  var BUILTIN_FILES = ['index.html', 'archives.html', 'about.html'];
-
+  /* 落地页唯一且锁定：template=landing 的页面不可删除，slug/模板锁定，
+     file 固定 index.html；其余页面全部是可改可删的动态页，
+     统一由 page.html?slug=<id> 渲染 */
   function isBuiltinPage(p) {
-    return BUILTIN_FILES.indexOf(p.file) > -1;
+    return p.template === 'landing';
   }
 
   function appLabel(id) {
@@ -1379,37 +1369,9 @@
     });
   }
 
-  /* v1 旧结构（home.modules/about）→ v2（page.apps 挂载数组），
-     随后由 apps.js normalizeV3 统一升级到 v3（分屏 / about-content→rich-content）。
-     空数据则直接交给 normalizeV3 返回内置兜底 */
-  function v1ToV2(data) {
-    var d = {
-      apps: {},
-      pages: [
-        { id: 'home', title: '首页', template: 'landing', file: 'index.html',
-          apps: [{ id: 'notice', enable: true }, { id: 'quote', enable: true },
-                 { id: 'search', enable: true }, { id: 'nav', enable: true },
-                 { id: 'posts', enable: true }] },
-        { id: 'archives', title: '归档', template: 'list', file: 'archives.html',
-          apps: [{ id: 'archive-list', enable: true }] },
-        { id: 'about', title: '关于', template: 'content', file: 'about.html',
-          apps: [{ id: 'about-content', enable: true }] }
-      ]
-    };
-    if (data && data.home && data.home.modules) {
-      d.pages[0].apps.forEach(function (a) {
-        if (data.home.modules[a.id] === false) a.enable = false;
-      });
-    }
-    if (data && data.about && data.about.content) {
-      d.apps['about-content'] = { content: data.about.content };
-      if (data.about.title) d.pages[2].title = data.about.title;
-    }
-    return d;
-  }
-
+  /* 页面文件统一过 apps.js normalizeV3 清洗（v3 结构）。
+     已不再兼容 v1/v2 旧数据：无 pages 时 normalizeV3 返回内置兜底 */
   function normalizePagesFile(data) {
-    if (data && (!Array.isArray(data.pages) || !data.pages.length)) data = v1ToV2(data);
     return window.SSBApps.normalizeV3(data);
   }
 
@@ -1485,14 +1447,16 @@
   /* ---------- 页面列表（摘要行：详细结构在编辑页中维护） ---------- */
 
   function tplOptions(selected, builtin) {
+    /* 落地页全站唯一：只有在编辑落地页本身时可选（其整个 select 其实已禁用）；
+       编辑其他页面时 landing 选项禁用，防止保存时出现第二个落地页 */
     var list = [
-      { v: 'landing', t: '落地页 landing' },
-      { v: 'list',    t: '列表页 list' },
-      { v: 'content', t: '内容页 content' }
+      { v: 'landing', t: '落地页 landing（唯一，不可再选）', lock: !builtin },
+      { v: 'list',    t: '列表页 list', lock: false },
+      { v: 'content', t: '内容页 content', lock: false }
     ];
     return list.map(function (o) {
       return '<option value="' + o.v + '"' +
-        (o.v === selected ? ' selected' : '') + (builtin ? ' disabled' : '') + '>' +
+        (o.v === selected ? ' selected' : '') + (o.lock ? ' disabled' : '') + '>' +
         o.t + '</option>';
     }).join('');
   }
@@ -1511,10 +1475,11 @@
     var builtin = isBuiltinPage(p);
     var badges =
       '<span class="pl-badge pl-tpl">' + p.template + '</span>' +
-      (p.file
-        ? '<span class="pl-badge">' + escapeHTML(p.file) + '</span>'
-        : '<span class="pl-badge pl-dyn">动态页</span>') +
-      (builtin ? '<span class="pl-badge pl-builtin">内置</span>' : '');
+      (builtin ? '<span class="pl-badge pl-builtin">落地页</span>'
+               : '<span class="pl-badge pl-dyn">动态页</span>');
+    /* 落地页锚定首位：自身不可下移；其他页面也不能上移越过它（idx=1 的上移禁用） */
+    var upDisabled = idx <= 1;
+    var downDisabled = builtin || idx === pagesWork.length - 1;
     return '<div class="card pl-row" data-idx="' + idx + '">' +
       '<span class="pl-grip" title="页面顺序即顶部导航顺序">≡</span>' +
       '<div class="pl-main">' +
@@ -1528,9 +1493,9 @@
         (builtin ? '' :
           '<button type="button" class="btn pl-act" data-pl-copy title="复制页面">复制</button>') +
         '<button type="button" class="btn pl-act" data-pl-up title="上移（导航顺序）" ' +
-          (idx === 0 ? 'disabled' : '') + '>↑</button>' +
+          (upDisabled ? 'disabled' : '') + '>↑</button>' +
         '<button type="button" class="btn pl-act" data-pl-down title="下移（导航顺序）" ' +
-          (idx === pagesWork.length - 1 ? 'disabled' : '') + '>↓</button>' +
+          (downDisabled ? 'disabled' : '') + '>↓</button>' +
         (builtin ? '' :
           '<button type="button" class="btn btn-danger pl-act" data-pl-del>删除</button>') +
       '</span>' +
@@ -1859,13 +1824,19 @@
         ? c.groupBy : (g.groupBy || 'year');
       var aOrder = c.order || g.order || 'newest';
       var filters = c.filters != null ? c.filters : (g.filters !== false);
+      var pageSize = c.pageSize != null ? c.pageSize : (g.pageSize != null ? g.pageSize : 10);
+      var showTotal = c.showTotal != null ? c.showTotal : (g.showTotal !== false);
       return '<div class="pe-cfg">' +
         '<label class="pe-cf"><span>分组方式</span>' +
           '<select class="pe-cfg-groupby">' + selOptions(GROUP_PAIRS, groupBy) + '</select></label>' +
         '<label class="pe-cf"><span>排序</span>' +
           '<select class="pe-cfg-order">' + selOptions(ORDER_PAIRS, aOrder) + '</select></label>' +
+        '<label class="pe-cf"><span>每页篇数（0=不分页）</span>' +
+          '<input type="number" class="pe-cfg-pagesize" min="0" max="999" step="1" value="' + pageSize + '"></label>' +
         '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-filters"' +
           (filters ? ' checked' : '') + '><span>分类筛选条</span></label>' +
+        '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-total"' +
+          (showTotal ? ' checked' : '') + '><span>显示文章总数</span></label>' +
       '</div>';
     }
 
@@ -1973,7 +1944,7 @@
       opts += '<option value="' + escapeHTML(w.file) + '"' + (on ? ' selected' : '') + '>' +
         escapeHTML(w.name) + '（' + (w.tone === 'dark' ? '暗' : '亮') + '）</option>';
     });
-    /* 当前配置指向一张已被移出 wallpapers.json 的图时保留原值，避免静默丢失 */
+    /* 当前配置指向一张已被移出 data/wallpapers.json 的图时保留原值，避免静默丢失 */
     if (selected && !hit) {
       opts += '<option value="' + escapeHTML(selected) + '" selected>' + escapeHTML(selected) + '</option>';
     }
@@ -2024,7 +1995,7 @@
         '<label class="form-field pe-bg-ops' + (bgOn ? '' : ' hidden') + '"><span>背景类型</span>' +
           '<select class="pe-bgtype">' + selOptions(BG_TYPE_PAIRS, rawBg) + '</select></label>' +
         '<label class="form-field pe-bgfile-wrap' + (bgOn && rawBg === 'wallpaper' ? '' : ' hidden') + '">' +
-          '<span>壁纸图片（图库维护在 wallpapers.json）</span>' +
+          '<span>壁纸图片（图库维护在 data/wallpapers.json）</span>' +
           '<select class="pe-bgfile">' + wallpaperOptionsHTML(bgFile) + '</select></label>' +
         '<div class="form-field"><span>布局方式（九宫格：盒组在屏内的位置）</span>' +
           grid9HTML(sc.vAlign || 'start', sc.hAlign || 'center') + '</div>' +
@@ -2039,7 +2010,7 @@
   }
 
   function pageFileHint(p) {
-    if (isBuiltinPage(p)) return '内置静态文件：' + escapeHTML(p.file);
+    if (isBuiltinPage(p)) return '落地页固定入口：index.html（全站唯一，不可删除）';
     /* 自建页统一走动态页 page.html?slug=，无需在仓库生成静态外壳 */
     return '动态页：page.html?slug=' + escapeHTML(p.id);
   }
@@ -2055,10 +2026,10 @@
       '<div class="form-grid form-grid-3">' +
         '<label class="form-field"><span>页面标题（导航文字 + 列表页 h1）</span>' +
           '<input type="text" class="pe-title" value="' + escapeHTML(p.title) + '" maxlength="20"></label>' +
-        '<label class="form-field"><span>页面标识 slug' + (builtin ? '（内置页锁定）' : '') + '</span>' +
+        '<label class="form-field"><span>页面标识 slug' + (builtin ? '（落地页锁定）' : '') + '</span>' +
           '<input type="text" class="pe-id" value="' + escapeHTML(p.id) + '"' +
             (builtin ? ' readonly' : '') + '></label>' +
-        '<label class="form-field"><span>页面模板' + (builtin ? '（内置页锁定）' : '') + '</span>' +
+        '<label class="form-field"><span>页面模板' + (builtin ? '（落地页锁定）' : '') + '</span>' +
           '<select class="pe-template"' + (builtin ? ' disabled' : '') + '>' +
             tplOptions(p.template, builtin) + '</select></label>' +
       '</div>' +
@@ -2165,10 +2136,16 @@
               if (title) cfg.title = title;   /* 留空时前台回落到默认「最新文章」 */
               inst.cfg = cfg;
             } else if (inst.id === 'archive-list') {
+              var ps = parseInt(row.querySelector('.pe-cfg-pagesize').value, 10);
+              if (isNaN(ps) || ps < 0 || ps > 999) {
+                throw new Error(where + '的归档列表「每页篇数」需为 0~999 的整数');
+              }
               inst.cfg = {
                 groupBy: row.querySelector('.pe-cfg-groupby').value,
                 order: row.querySelector('.pe-cfg-order').value === 'oldest' ? 'oldest' : 'newest',
-                filters: row.querySelector('.pe-cfg-filters').checked
+                pageSize: ps,
+                filters: row.querySelector('.pe-cfg-filters').checked,
+                showTotal: row.querySelector('.pe-cfg-total').checked
               };
             } else if (inst.id === 'rich-content') {
               inst.cfg = { html: row.querySelector('.pe-rich-body').innerHTML };
@@ -2195,8 +2172,10 @@
 
   function validatePages(pages) {
     var seen = {};
+    var landingCount = 0;
     for (var i = 0; i < pages.length; i++) {
       var p = pages[i];
+      if (p.template === 'landing') landingCount++;
       if (!p.id) return '第 ' + (i + 1) + ' 个页面缺少页面标识 id';
       if (!/^[a-z0-9-]+$/.test(p.id)) return '页面标识只能是英文/数字/短横线：' + p.id;
       if (seen[p.id]) return '存在重复的页面标识：' + p.id;
@@ -2217,6 +2196,8 @@
         }
       }
     }
+    if (landingCount === 0) return '必须保留一个落地页（template=landing，首页 index.html）';
+    if (landingCount > 1) return '落地页只能有一个，检测到 ' + landingCount + ' 个';
     return null;
   }
 
@@ -2224,7 +2205,7 @@
 
   function loadWallpaperOptions() {
     /* 壁纸清单供屏幕背景下拉使用；加载失败不影响页面编辑（仅少了可选项） */
-    return readDataFile('wallpapers.json').then(function (d) {
+    return readDataFile('data/wallpapers.json').then(function (d) {
       wallpaperOptions = (d && Array.isArray(d.wallpapers)) ? d.wallpapers : [];
     }).catch(function () { wallpaperOptions = []; });
   }
@@ -2237,7 +2218,7 @@
 
     /* 先确保应用注册表就绪：页面编辑器的板块名称/「添加板块」下拉都读它 */
     loadAdminApps()
-      .then(function () { return Promise.all([readDataFile('pages.json'), loadWallpaperOptions()]); })
+      .then(function () { return Promise.all([readDataFile('data/pages.json'), loadWallpaperOptions()]); })
       .then(function (r) {
       var data = normalizePagesFile(r[0]);
       /* pagesData 保留整份文件快照（含顶层 _comment），保存时深拷贝回写，
@@ -2268,10 +2249,10 @@
     var err = validatePages(pagesWork);
     if (err) return { error: err };
 
-    /* 自建页 file 统一留空：走动态页 page.html?slug=，
-       不在仓库生成静态外壳；内置三页的 file 锁死不动 */
+    /* file 收敛：落地页固定 index.html；其余页面一律动态渲染，file 置空，
+       仓库中不为任何普通页面保留静态外壳 */
     pagesWork.forEach(function (p) {
-      if (!isBuiltinPage(p)) p.file = '';
+      p.file = isBuiltinPage(p) ? 'index.html' : '';
     });
 
     /* 基于整份快照深拷贝（保留 _comment 等表外字段），
@@ -2281,7 +2262,7 @@
     next.responsive = JSON.parse(JSON.stringify(respWork || { templates: [] }));
 
     /* 悬空引用清理：模板被删除或改了层级后，仍指向它的挂载引用直接摘除。
-       前台 normalize 虽能自愈忽略，但后台保存就应保持 pages.json 数据干净 */
+       前台 normalize 虽能自愈忽略，但后台保存就应保持 data/pages.json 数据干净 */
     var validTpl = {};
     (next.responsive.templates || []).forEach(function (t) { validTpl[t.id] = t.appliesTo; });
     function pruneRef(holder, level) {
@@ -2354,7 +2335,7 @@
 
     try {
       localStorage.setItem(LS_APP_PREFIX + 'pages', JSON.stringify(data, null, 2));
-      pendingMark('pages.json', '页面结构', '页面结构');
+      pendingMark('data/pages.json', '页面结构', '页面结构');
     } catch (e) {
       btn.disabled = false;
       btn.textContent = '保存页面';
@@ -2370,7 +2351,7 @@
     if (editIndex >= 0) renderPageEditor();
     showPagesMsg('已保存到本浏览器，刷新前台即可看到效果', false);
     toast('页面管理已保存');
-    /* pages.json 的 apps 节点同时被「应用管理」编辑，保存后使其快照失效 */
+    /* data/pages.json 的 apps 节点同时被「应用管理」编辑，保存后使其快照失效 */
     appsLoaded = false;
   }
 
@@ -2394,6 +2375,11 @@
       return;
     }
     if (!title) { showPagesMsg('请填写页面标题', true); return; }
+    /* 落地页全站唯一且已存在，新建页只允许 list/content（表单已去掉该选项，此处兜底） */
+    if (tpl === 'landing') {
+      showPagesMsg('落地页已存在且唯一，不能新建第二个落地页', true);
+      return;
+    }
     if (pagesWork.some(function (p) { return p.id === slug; })) {
       showPagesMsg('已存在同标识页面：' + slug, true);
       return;
@@ -2414,9 +2400,14 @@
     openPageEditor(pagesWork.length - 1);
   }
 
-  /* 复制页面：深拷贝结构并全部重发 uid（uid 在全站范围内必须唯一） */
+  /* 复制页面：深拷贝结构并全部重发 uid（uid 在全站范围内必须唯一）。
+     落地页不允许复制（列表行无复制按钮，此处兜底防唯一约束被绕过） */
   function duplicatePage(idx) {
     var src = pagesWork[idx];
+    if (isBuiltinPage(src)) {
+      showPagesMsg('落地页唯一，不能复制', true);
+      return;
+    }
     var base = src.id + '-copy';
     var id = base;
     var n = 2;
@@ -2448,10 +2439,10 @@
       }
     });
     $('btn-pages-reset').addEventListener('click', function () {
-      if (!confirm('确定删除本浏览器里保存的页面管理覆盖，恢复为仓库 pages.json 的默认内容吗？')) return;
+      if (!confirm('确定删除本浏览器里保存的页面管理覆盖，恢复为仓库 data/pages.json 的默认内容吗？')) return;
       try {
         localStorage.removeItem(LS_APP_PREFIX + 'pages');
-        pendingForget('pages.json');
+        pendingForget('data/pages.json');
       } catch (e) {}
       location.reload();
     });
@@ -2472,14 +2463,15 @@
         openPageEditor(idx);
       } else if (e.target.closest('[data-pl-copy]')) {
         duplicatePage(idx);
-      } else if (e.target.closest('[data-pl-up]') && idx > 0) {
+      } else if (e.target.closest('[data-pl-up]') && idx > 1) {
         pagesWork.splice(idx - 1, 0, pagesWork.splice(idx, 1)[0]);
         renderPagesList();
-      } else if (e.target.closest('[data-pl-down]') && idx < pagesWork.length - 1) {
+      } else if (e.target.closest('[data-pl-down]') &&
+                 !isBuiltinPage(page) && idx < pagesWork.length - 1) {
         pagesWork.splice(idx + 1, 0, pagesWork.splice(idx, 1)[0]);
         renderPagesList();
       } else if (e.target.closest('[data-pl-del]')) {
-        if (!confirm('确定删除页面「' + page.title + '」吗？保存后线上对应静态文件也会移除。')) return;
+        if (!confirm('确定删除页面「' + page.title + '」吗？删除后该页入口导航消失、链接无法访问。')) return;
         pagesWork.splice(idx, 1);
         renderPagesList();
       }
@@ -2701,7 +2693,7 @@
           else respWork.templates[respEdit.idx] = tpl;
           respEdit = null;
           renderRespLib();
-          showPagesMsg('模板已存入草稿，还需点右上角「保存页面」才会写入 pages.json', false);
+          showPagesMsg('模板已存入草稿，还需点右上角「保存页面」才会写入 data/pages.json', false);
         } catch (err) {
           toast(err.message, true);
         }
@@ -2849,7 +2841,7 @@
     el.textContent = text || '';
   }
 
-  /* appsData = { manifest, pagesFile, apps:pages.json 顶层 apps, data:{数据文件名:JSON} } */
+  /* appsData = { manifest, pagesFile, apps:data/pages.json 顶层 apps, data:{数据文件名:JSON} } */
   var appsData = null;
   var appEdit = null;    /* {id, isNew, paramsSig, dataRendered} */
 
@@ -2858,15 +2850,12 @@
     $('apps-grid').innerHTML = '<div class="site-loading">加载中…</div>';
     Promise.all([
       loadAdminApps(true),                 /* 强制重读：代码可能被别处改过 */
-      readDataFile('pages.json')
+      readDataFile('data/pages.json')
     ]).then(function (r) {
       var pagesFile = r[1] || {};
-      /* 与「页面管理」手中的快照形态保持一致，避免本视图保存时把旧节点写回去 */
-      if (Array.isArray(pagesFile.pages)) {
-        pagesFile = window.SSBApps.normalizeV3(pagesFile);
-      } else if (pagesFile.apps && pagesFile.apps['about-content']) {
-        delete pagesFile.apps['about-content'];
-      }
+      /* 与「页面管理」手中的快照形态保持一致，避免本视图保存时把旧节点写回去；
+         无 pages 的陈旧数据由 normalizeV3 回落内置兜底 */
+      pagesFile = window.SSBApps.normalizeV3(pagesFile);
 
       /* 各应用的数据文件（清单里登记了 dataFile 的） */
       var dataFiles = {};
@@ -2983,9 +2972,11 @@
   }
 
   function appDataKind(dataFile) {
-    if (dataFile === 'search-engines.json') return 'engines';
-    if (dataFile === 'nav-links.json') return 'nav';
-    if (dataFile === 'quotes.json') return 'quotes';
+    /* dataFile 现在带 data/ 目录，取文件名再判断编辑器类型 */
+    var base = String(dataFile || '').split('/').pop();
+    if (base === 'search-engines.json') return 'engines';
+    if (base === 'nav-links.json') return 'nav';
+    if (base === 'quotes.json') return 'quotes';
     return dataFile ? 'json' : '';
   }
 
@@ -3099,7 +3090,7 @@
       if (preserve && Object.prototype.hasOwnProperty.call(draft, s.key)) {
         val = draft[s.key];                       /* 切 tab 重绘：优先保住用户已填值 */
       } else if (window.SSBApps.getPath(globalCfg, s.key) !== undefined) {
-        val = window.SSBApps.getPath(globalCfg, s.key);   /* pages.json 全局值 */
+        val = window.SSBApps.getPath(globalCfg, s.key);   /* data/pages.json 全局值 */
       } else {
         val = window.SSBApps.getPath(defaults, s.key);   /* schema 默认值 */
       }
@@ -3250,13 +3241,14 @@
   /* 仓库提交路径 → localStorage 键（与前台 apps.js / common.js 约定一致） */
   function localAppKey(path) {
     if (path === MANIFEST_PATH) return LS_APP_PREFIX + 'applications/applications';
-    if (path === 'pages.json') return LS_APP_PREFIX + 'pages';
-    if (path === SITE_FILES.config) return LS_SITE_KEY;
+    if (path === 'data/pages.json') return LS_APP_PREFIX + 'pages';
+    if (path === SITE_CONFIG_FILE) return LS_SITE_KEY;
     if (path.indexOf(window.SSBApps.appsDir) === 0 && /\.js$/.test(path)) {
       return window.SSBApps.appCodeKey +
         path.slice(window.SSBApps.appsDir.length).replace(/\.js$/, '');
     }
-    return LS_APP_PREFIX + path.replace(/\.json$/, '');
+    /* 数据文件统一取文件名做 LS 键（data/ 目录不进键名） */
+    return LS_APP_PREFIX + path.split('/').pop().replace(/\.json$/, '');
   }
 
   function saveAppEditor() {
@@ -3288,12 +3280,12 @@
       files.push({ path: MANIFEST_PATH, content: JSON.stringify(mf, null, 2) + '\n' });
     }
 
-    /* 3. pages.json：schema 参数合入顶层 apps[id]，保留表外键与 pages 数组 */
+    /* 3. data/pages.json：schema 参数合入顶层 apps[id]，保留表外键与 pages 数组 */
     var pf = JSON.parse(JSON.stringify(appsData.pagesFile || {}));
     pf.apps = pf.apps || {};
     pf.apps[id] = Object.assign({}, pf.apps[id] || {}, c.patch);
     if (JSON.stringify(pf) !== JSON.stringify(appsData.pagesFile || {})) {
-      files.push({ path: 'pages.json', content: JSON.stringify(pf, null, 2) + '\n' });
+      files.push({ path: 'data/pages.json', content: JSON.stringify(pf, null, 2) + '\n' });
     }
 
     /* 4. 数据文件（与现值相同则跳过） */
@@ -3482,7 +3474,7 @@
 '   SSB 自定义应用：' + name + '（' + id + '）\n' +
 '   ------------------------------------------------------------\n' +
 '   render(mount, ctx)：ctx.cfg 是三层合并后的参数（schema 默认 ∪\n' +
-'   pages.json 全局 ∪ 板块实例 cfg）；ctx.inst 是板块实例。\n' +
+'   data/pages.json 全局 ∪ 板块实例 cfg）；ctx.inst 是板块实例。\n' +
 '   返回 false = 无内容（自动隐藏壳）；也可返回 Promise 或销毁函数。\n' +
 '   U = BlogUtils：U.escapeHTML / U.config / U.loadDataFile 等。\n' +
 '   需要独立数据时，保存后在「数据」标签里登记一个 .json 文件名。\n' +
@@ -3607,15 +3599,15 @@
 
   function pendingGroup(path) {
     if (/^applications\/.+\.js$/.test(path)) return '应用代码';
-    if (path === 'pages.json') return '页面结构';
+    if (path === 'data/pages.json') return '页面结构';
     if (path === 'site-config.json') return '站点配置';
-    if (path === 'posts-list.json' || /^posts\//.test(path)) return '文章';
+    if (path === 'data/posts-list.json' || /^posts\//.test(path)) return '文章';
     return '应用清单与数据';
   }
   function appPendingTitle(path, appId) {
     if (/\.js$/.test(path)) return '应用代码：' + appId;
     if (path === MANIFEST_PATH) return '应用清单 applications.json';
-    if (path === 'pages.json') return '页面结构（含应用全局参数）';
+    if (path === 'data/pages.json') return '页面结构（含应用全局参数）';
     return '应用数据：' + path;
   }
   function isAppJsPath(p) { return /^applications\/.+\.js$/.test(p); }
@@ -3625,7 +3617,7 @@
      JSON 做归一化，保证与仓库版可比 */
   function pendingLocalText(path) {
     try {
-      if (path === 'posts-list.json') {
+      if (path === 'data/posts-list.json') {
         return localStorage.getItem(LS_LIST_KEY);
       }
       if (isPostHtmlPath(path)) {
@@ -3706,7 +3698,7 @@
           keep = false;
         } else if (base == null) {
           keep = true;                          /* 仓库没有 → 新增 */
-        } else if (p === 'posts-list.json') {
+        } else if (p === 'data/posts-list.json') {
           keep = (readLocalList().length > 0);
         } else if (/\.json$/.test(p)) {
           keep = !jsonSame(local, base);
@@ -3873,8 +3865,8 @@
      它们继续留在本地列表里 */
   function buildCommittedPostList(selectedEntries) {
     var base = [];
-    if (commitBase['posts-list.json']) {
-      try { base = JSON.parse(commitBase['posts-list.json']); } catch (e) {}
+    if (commitBase['data/posts-list.json']) {
+      try { base = JSON.parse(commitBase['data/posts-list.json']); } catch (e) {}
     }
     var selMap = {};
     selectedEntries.forEach(function (e) { selMap[e.file] = e; });
@@ -3934,27 +3926,27 @@
     return Promise.resolve({ files: files, entry: cleanPostEntry(item, finalCover) });
   }
 
-  /* pages.json → 提交文件：富文本图片抽出上传。
+  /* data/pages.json → 提交文件：富文本图片抽出上传。
      自建页统一走动态页 page.html?slug=（file 为空），不生成静态外壳；
      仓库基线中残留的旧 page-*.html 外壳（旧工作流产物）随本次提交删除 */
   function buildPagesCommit() {
-    var data = JSON.parse(pendingLocalText('pages.json'));
+    var data = JSON.parse(pendingLocalText('data/pages.json'));
     var clone = JSON.parse(JSON.stringify(data));
 
     var uploads = collectRichImageUploads(clone.pages || []);
     applyRichImageReplacements(clone.pages || [], uploads.map);
 
     var basePageFiles = [];
-    if (commitBase['pages.json']) {
+    if (commitBase['data/pages.json']) {
       try {
-        basePageFiles = (JSON.parse(commitBase['pages.json']).pages || [])
+        basePageFiles = (JSON.parse(commitBase['data/pages.json']).pages || [])
           .map(function (p) { return p.file; }).filter(Boolean);
       } catch (e) {}
     }
 
     var files = uploads.files.slice();
-    files.push({ path: 'pages.json', content: JSON.stringify(clone, null, 2) + '\n' });
-    /* 基线里旧工作流生成的 page-*.html，新 pages.json 已不再引用 → 删除 */
+    files.push({ path: 'data/pages.json', content: JSON.stringify(clone, null, 2) + '\n' });
+    /* 基线里旧工作流生成的 page-*.html，新 data/pages.json 已不再引用 → 删除 */
     var deletes = basePageFiles.filter(function (f) {
       return /^page-.+\.html$/.test(f) &&
         !(clone.pages || []).some(function (p) { return p.file === f; });
@@ -3993,9 +3985,9 @@
     var autoNotes = [];
 
     /* 依赖自动补齐：文章新增/编辑/删除都必须连同文章列表；删应用必须连同应用清单 */
-    if (paths.some(isPostHtmlPath) && paths.indexOf('posts-list.json') === -1) {
-      paths.push('posts-list.json');
-      autoNotes.push('文章列表 posts-list.json');
+    if (paths.some(isPostHtmlPath) && paths.indexOf('data/posts-list.json') === -1) {
+      paths.push('data/posts-list.json');
+      autoNotes.push('文章列表 data/posts-list.json');
     }
     if (paths.some(function (p) { return ops[p] === 'del' && isAppJsPath(p); }) &&
         paths.indexOf(MANIFEST_PATH) === -1 &&
@@ -4005,7 +3997,7 @@
     }
 
     var nPosts = paths.filter(isPostHtmlPath).length;
-    var nPages = paths.indexOf('pages.json') !== -1 ? 1 : 0;
+    var nPages = paths.indexOf('data/pages.json') !== -1 ? 1 : 0;
     var msg = $('cm-message').value.trim();
     if (!msg) {
       var bits = [];
@@ -4042,7 +4034,7 @@
           return { kind: 'post', path: p, files: r.files, entry: r.entry };
         });
       }
-      if (p === 'pages.json') {
+      if (p === 'data/pages.json') {
         var r2 = buildPagesCommit();
         return Promise.resolve({
           kind: 'pages', path: p,
@@ -4073,7 +4065,7 @@
       });
 
       /* 文章列表：仓库基线 + 本次勾选文章覆盖 - 本次删除文章 */
-      if (paths.indexOf('posts-list.json') !== -1) {
+      if (paths.indexOf('data/posts-list.json') !== -1) {
         var selectedEntries = results.filter(function (r) {
           return r.kind === 'post';
         }).map(function (r) { return r.entry; });
@@ -4085,8 +4077,8 @@
         });
         var list = buildCommittedPostList(selectedEntries)
           .filter(function (e) { return !deletedFiles[e.file]; });
-        files = files.filter(function (f) { return f.path !== 'posts-list.json'; });
-        files.push({ path: 'posts-list.json', content: JSON.stringify(list, null, 2) + '\n' });
+        files = files.filter(function (f) { return f.path !== 'data/posts-list.json'; });
+        files.push({ path: 'data/posts-list.json', content: JSON.stringify(list, null, 2) + '\n' });
       }
       return commitFiles(files, deletes, msg);
     }).then(function () {
@@ -4102,7 +4094,7 @@
         try {
           if (isPostHtmlPath(p)) {
             localStorage.removeItem(LS_CONTENT_KEY + p.slice('posts/'.length));
-          } else if (p === 'posts-list.json') {
+          } else if (p === 'data/posts-list.json') {
             if (Object.keys(remainPosts).length) {
               writeLocalList(Object.keys(remainPosts).map(function (f) { return remainPosts[f]; }));
             } else {
@@ -4114,8 +4106,8 @@
         } catch (e) {}
         pendingForget(p);
       });
-      /* writeLocalList 会重新登记 posts-list.json，未提交完时保留该登记 */
-      if (!Object.keys(remainPosts).length) pendingForget('posts-list.json');
+      /* writeLocalList 会重新登记 data/posts-list.json，未提交完时保留该登记 */
+      if (!Object.keys(remainPosts).length) pendingForget('data/posts-list.json');
 
       btn.disabled = false;
       btn.textContent = '提交选中项到 GitHub';
@@ -4213,7 +4205,9 @@
         /* 同步清掉这些路径的待提交登记 */
         pendingClear(function (p) {
           return p.indexOf('applications/') === 0 ||
-                 p === 'search-engines.json' || p === 'quotes.json' || p === 'nav-links.json';
+                 p === 'data/search-engines.json' ||
+                 p === 'data/quotes.json' ||
+                 p === 'data/nav-links.json';
         });
       } catch (e) {}
       location.reload();

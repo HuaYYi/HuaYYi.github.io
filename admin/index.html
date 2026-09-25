@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-ctx-native>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -165,7 +165,7 @@
           <div class="form-msg" id="pages-msg"></div>
 
           <!-- 响应式模板库：断点规则模板按层级分类（屏/盒/板块），供编辑页的
-               「响应式」下拉挂载；数据存 pages.json 顶层 responsive，随「保存页面」一起提交 -->
+               「响应式」下拉挂载；数据存 data/pages.json 顶层 responsive，随「保存页面」一起提交 -->
           <div class="card site-card" id="resp-lib-card">
             <section class="site-section">
               <h2>响应式模板库</h2>
@@ -194,7 +194,6 @@
                   <select id="f-page-template">
                     <option value="list">列表页 list（归档式容器）</option>
                     <option value="content">内容页 content（富文本容器）</option>
-                    <option value="landing">落地页 landing（全屏首屏容器）</option>
                   </select>
                 </label>
               </div>
@@ -211,7 +210,7 @@
           </div>
         </section>
 
-        <!-- 视图四之二：单页编辑（屏 → 盒子 → 板块 三级结构，数据存 pages.json） -->
+        <!-- 视图四之二：单页编辑（屏 → 盒子 → 板块 三级结构，数据存 data/pages.json） -->
         <section class="view hidden" id="view-page-editor">
           <div class="action-row">
             <button type="button" class="btn" id="btn-pe-back">← 返回页面列表</button>
@@ -272,7 +271,7 @@
               </div>
 
               <div class="ae-tabpane hidden" data-pane="params">
-                <p class="section-hint">该应用声明的可调参数（来自代码里的 configSchema），保存在 pages.json 的 apps 节点，作为所有实例的全局默认；单个板块仍可在「页面管理」里覆盖。</p>
+                <p class="section-hint">该应用声明的可调参数（来自代码里的 configSchema），保存在 data/pages.json 的 apps 节点，作为所有实例的全局默认；单个板块仍可在「页面管理」里覆盖。</p>
                 <div id="ae-params"></div>
               </div>
 

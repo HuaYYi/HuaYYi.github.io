@@ -1,6 +1,6 @@
 /* ============================================================
    SSB 应用：随机名言（quote）
-   数据文件：quotes.json（一行一条，后台应用管理中维护）
+   数据文件：data/quotes.json（一行一条）
    硬性规则：预留 N 行高度；超过 N 行字号自动缩小直到容下，绝不截断
    ============================================================ */
 SSBApps.define({
@@ -8,7 +8,7 @@ SSBApps.define({
   name: '随机名言',
   desc: '从名言库随机取一条，打字机效果逐字展示',
   hero: true,
-  dataFile: 'quotes.json',
+  dataFile: 'data/quotes.json',
   configSchema: [
     { key: 'speed', label: '打字速度（每字间隔毫秒，越小越快）', type: 'number', min: 0, max: 1000, step: 10, def: 60 },
     { key: 'lines', label: '预留行数（超出自动缩小字号，绝不截断）', type: 'number', min: 1, max: 6, step: 1, def: 3 },
@@ -71,9 +71,8 @@ html[data-theme="dark"] {
 `,
   render: function (mount, ctx) {
     var conf = ctx.cfg || {};
-    /* 兼容旧版：打字速度原存 site-config.json 的 quoteSpeed */
-    var SPEED = conf.speed != null ? conf.speed
-      : (U.config && U.config.quoteSpeed != null ? Number(U.config.quoteSpeed) : 60);
+    /* 打字速度：应用参数表单维护（schema 默认 60ms） */
+    var SPEED = conf.speed != null ? Number(conf.speed) : 60;
     var LINES = Number(conf.lines) || 3;
     var LINE_HEIGHT = Number(conf.lineHeight) || 1.7;
     var FS_MAX = Number(conf.fsMax) || 22;
@@ -83,7 +82,7 @@ html[data-theme="dark"] {
     el.className = 'hero-quote';
     mount.appendChild(el);
 
-    return U.loadDataFile('quotes.json')
+    return U.loadDataFile('data/quotes.json')
       .then(function (arr) {
         if (!arr || !arr.length) return;
         var text = arr[Math.floor(Math.random() * arr.length)];

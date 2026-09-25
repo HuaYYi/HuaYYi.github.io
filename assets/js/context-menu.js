@@ -9,15 +9,16 @@
                  复制本页链接、快捷导航
    - 背景/壁纸选择写 localStorage（ssb.bg-pref），由 common.js 的
      SSBScreenBG 统一应用；文章页等无屏幕背景的页面不显示背景组。
-   - /admin/ 后台不接管，保留浏览器原生右键（管理操作需要它）。
+   - 带 data-ctx-native 标记的页面不接管菜单，保留浏览器原生右键。
    - 触摸设备没有右键：右下角显示一个「⋯」工具箱悬浮按钮作为兜底入口。
    ============================================================ */
 
 (function () {
   'use strict';
 
-  /* 后台保留原生右键菜单 */
-  if (/\/admin(?:\/|$)/.test(location.pathname)) return;
+  /* 标记了 data-ctx-native 的页面保留原生菜单。
+     用页面标记而非路径名判断，避免代码里出现可被搜索到的路径词 */
+  if (document.documentElement.hasAttribute('data-ctx-native')) return;
 
   var U = window.BlogUtils;
   var menuEl = null;

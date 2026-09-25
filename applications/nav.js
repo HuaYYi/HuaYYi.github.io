@@ -1,6 +1,6 @@
 /* ============================================================
    SSB 应用：网址导航（nav）
-   数据文件：nav-links.json（[{category, links:[{name,url}]}]）
+   数据文件：data/nav-links.json（[{category, links:[{name,url}]}]）
    v3：每个实例独立的 tab/分页状态（zone.__navState），
    窗口缩放时遍历全部实例重算；触摸滑动、圆点、跨 tab 翻页保留。
    screen-scroll.js 通过 SSBApps.navGo(delta, zoneEl) 调用 wheel 钩子
@@ -25,7 +25,7 @@
     name: '网址导航',
     desc: '分类标签页 + 卡片网格 + 分页轮播（触摸滑动 / 圆点 / 滚轮翻页）',
     hero: true,
-    dataFile: 'nav-links.json',
+    dataFile: 'data/nav-links.json',
     configSchema: [
       { key: 'panel.enable', label: '启用毛玻璃盒子', type: 'boolean', def: true },
       { key: 'panel.opacity', label: '盒子不透明度（0~1，越大越实）', type: 'number', min: 0, max: 1, step: 0.05, def: 0.4 },
@@ -262,9 +262,8 @@ html[data-theme="dark"] .nav-zone {
 `,
     render: function (mount, ctx) {
       var conf = ctx.cfg || {};
-      /* 兼容旧版：面板参数原存 site-config.json 的 navPanel */
-      var legacy = (U.config && U.config.navPanel) || {};
-      var panel = conf.panel && typeof conf.panel === 'object' ? conf.panel : legacy;
+      /* 毛玻璃盒子参数（应用参数表单维护，三层配置合并进 conf.panel） */
+      var panel = conf.panel && typeof conf.panel === 'object' ? conf.panel : {};
       var rows = Number(conf.perPageRows) || 2;
 
       var zone = document.createElement('div');
@@ -288,7 +287,7 @@ html[data-theme="dark"] .nav-zone {
       zone.__navState = state;
       navInstances.push(state);
 
-      return U.loadDataFile('nav-links.json')
+      return U.loadDataFile('data/nav-links.json')
         .then(function (groups) {
           if (!groups || !groups.length) { zone.remove(); return; }
           state.data = groups;
