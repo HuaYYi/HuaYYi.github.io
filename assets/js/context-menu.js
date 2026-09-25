@@ -248,16 +248,12 @@
         onClick: function () {
           /* 访客主动清空该页背景（覆盖作者配置；清除偏好可恢复） */
           window.SSBScreenBG.setPref({ mode: 'none' });
-          refreshAndKeep();
-          return true;
         }
       }));
       nodes.push(itemNode({
         label: '粒子动画', checked: mode === 'particles',
         onClick: function () {
           window.SSBScreenBG.setPref({ mode: 'particles' });
-          refreshAndKeep();
-          return true;
         }
       }));
       nodes.push(separatorNode());
@@ -273,8 +269,6 @@
             window.SSBScreenBG.setPref({
               mode: 'wallpaper', file: w.file, tone: w.tone, followTone: follow
             });
-            refreshAndKeep();
-            return true;
           }
         }));
       });
@@ -282,8 +276,6 @@
         label: '随机壁纸（换一张）',
         onClick: function () {
           window.SSBScreenBG.shuffleWallpaper();
-          refreshAndKeep();
-          return true;
         }
       }));
       nodes.push(separatorNode());
@@ -295,30 +287,11 @@
           var next = pref && pref.followTone === false;
           window.SSBScreenBG.setFollowTone(next);
           if (next) window.SSBScreenBG.setPref(window.SSBScreenBG.getPref());
-          refreshAndKeep();
-          return true;
         }
       }));
 
       return nodes;
     });
-  }
-
-  /* 勾选背景项后菜单内容（勾选态）需要刷新：保留当前展开位置重建一次 */
-  function refreshAndKeep() {
-    if (!lastTarget) return;
-    var rect = menuEl.getBoundingClientRect();
-    build(lastTarget);
-    show(rect.left, rect.top);
-    /* 重新展开背景子菜单 */
-    var subs = menuEl.querySelectorAll('.ssb-ctx-sub');
-    if (subs.length) {
-      var bgSub = Array.prototype.filter.call(subs, function (s) {
-        var t = s.querySelector('.ssb-ctx-label');
-        return t && t.textContent === '背景';
-      })[0];
-      if (bgSub) { bgSub.classList.add('open'); bgSub.__fill && bgSub.__fill(); }
-    }
   }
 
   function navSubmenu() {
@@ -351,15 +324,10 @@
           label: opt.label,
           icon: U ? U.icon(opt.icon) : '',
           checked: current === opt.mode,
-          onClick: function (node) {
+          onClick: function () {
             U.setThemeMode(opt.mode);
-            /* 立即重建子项，让 ✓ 移动到新模式：
-               旧实现只更新 LS/主题，勾选标记停在 fill 时的旧项，
-               会出现「勾在亮色、页面像暗色」的错觉。
-               node 自身在 fill 中被替换，但此刻已在其旧监听器内，安全 */
-            var subItem = node.closest('.ssb-ctx-sub');
-            if (subItem && subItem.__fill) subItem.__fill();
-            return true;   /* 保持菜单打开 */
+            /* 不返回 true：选定即最终结果，菜单直接关闭。
+               勾选态无需现场刷新——下次打开时 build() 会重新生成 */
           }
         });
       });

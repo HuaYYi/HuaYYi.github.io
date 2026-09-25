@@ -19,6 +19,13 @@ SSBApps.define({
   css: `
 :root {
   --quote-fs: 22px;        /* 名言字号（JS 自适应会内联覆盖） */
+  /* 标语描边色：取当前模式的页面底色、略透明。
+     标语压在粒子/壁纸背景上，容易被背景花纹干扰；
+     一圈与底色同色的细描边把字形「切」出背景，又不发光、不发糊 */
+  --quote-stroke: rgba(255, 255, 255, .78);
+}
+html[data-theme="dark"] {
+  --quote-stroke: rgba(15, 18, 23, .82);
 }
 /* 3 行高度预留（硬性规则）：min-height = N × 行高，em 跟随元素自身
    字号，JS 缩小字号时预留高度同步缩放。flex-end 底对齐：文字换行
@@ -37,6 +44,17 @@ SSBApps.define({
   text-align: center;
   line-height: 1.7;
   overflow: hidden;
+  /* 8 方向 1px、0 模糊 = 纯色细描边（不是发光阴影）：
+     描边色随亮/暗主题切换；量很小，近看只有一圈干净轮廓 */
+  text-shadow:
+    -1px -1px 0 var(--quote-stroke),
+     1px -1px 0 var(--quote-stroke),
+    -1px  1px 0 var(--quote-stroke),
+     1px  1px 0 var(--quote-stroke),
+     0   -1px 0 var(--quote-stroke),
+     0    1px 0 var(--quote-stroke),
+    -1px  0   0 var(--quote-stroke),
+     1px  0   0 var(--quote-stroke);
 }
 /* 打字过程中显示光标（CSS 动画闪烁） */
 .hero-quote.typing::after {
