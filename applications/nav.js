@@ -262,6 +262,15 @@ html[data-theme="dark"] .nav-zone {
   .nav-cards { --nav-cols: 2; }
   .nav-zone { padding: 12px 8px 10px; }
 }
+/* 当前屏有背景时：面板更透（!important 压过后台配置的行内变量值）；
+   卡片 40% 半透明（自带 blur 毛玻璃），hover 仍回到完全实心 */
+.cur-bg-on .nav-zone { --panel-opacity: .42 !important; }
+html[data-theme="dark"].cur-bg-on .nav-zone { --panel-opacity: .38 !important; }
+.cur-bg-on .nav-card,
+.cur-bg-on .nav-card-disabled { background: rgba(255, 255, 255, .4); }
+html[data-theme="dark"].cur-bg-on .nav-card,
+html[data-theme="dark"].cur-bg-on .nav-card-disabled { background: rgba(24, 29, 38, .4); }
+.cur-bg-on .nav-card:hover { background: var(--surface); }
 `,
     render: function (mount, ctx) {
       var conf = ctx.cfg || {};

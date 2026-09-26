@@ -307,6 +307,27 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
   background: var(--header-bg);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--border);
+  transition: background .25s, border-color .25s;
+}
+
+/* 当前停留屏有背景时：头部改半透明毛玻璃，透出该屏背景层
+   （无背景屏/归档/关于/文章页保持上方默认实心，零影响） */
+html.cur-bg-on .site-header {
+  background: rgba(255, 255, 255, .55);
+  border-bottom-color: rgba(255, 255, 255, .55);
+}
+html[data-theme="dark"].cur-bg-on .site-header {
+  background: rgba(15, 20, 28, .5);
+  border-bottom-color: rgba(255, 255, 255, .08);
+}
+
+/* 第一屏背景铺满到头部后面：不动布局（负 margin 会改变 offsetTop，
+   破坏 screen-scroll.js 的 dock 几何），只让背景层向上延伸一个头部
+   高度；视频/图片 object-fit:cover，延伸区自然填满；层 z-index:0
+   低于 fixed 头部（z-index:100），头部半透明时即可透出 */
+.page-screen:first-child.bg-active > .screen-bg {
+  top: calc(-1 * var(--header-h));
+  height: calc(100% + var(--header-h));
 }
 
 .header-inner {

@@ -7,6 +7,12 @@
   "colors": [
     { "value": "none",    "name": "无",   "tone": "" },
     { "value": "#ffffff", "name": "白色", "tone": "light" },
-    { "value": "#000000", "name": "黑色", "tone": "dark" }
+    { "value": "#000000", "name": "黑色", "tone": "dark" },
+    { "value": "linear-gradient(135deg,#74ebd5,#9face6)", "name": "薄荷清晨", "tone": "light" },
+    { "value": "linear-gradient(135deg,#fbc2eb,#a6c1ee)", "name": "樱花淡粉", "tone": "light" },
+    { "value": "linear-gradient(135deg,#d4fc79,#96e6a1)", "name": "嫩绿晨光", "tone": "light" },
+    { "value": "linear-gradient(135deg,#667eea,#764ba2)", "name": "极光蓝紫", "tone": "dark" },
+    { "value": "linear-gradient(135deg,#0f2027,#203a43,#2c5364)", "name": "深夜青蓝", "tone": "dark" },
+    { "value": "linear-gradient(135deg,#41295a,#2f0743)", "name": "紫夜星云", "tone": "dark" }
   ]
 }

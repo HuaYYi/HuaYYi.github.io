@@ -180,6 +180,16 @@
     height: 40px;
   }
 }
+/* 当前屏有背景时：搜索框半透明毛玻璃，透出背景 */
+.big-search { transition: background .25s; }
+.cur-bg-on .big-search {
+  background: rgba(255, 255, 255, .55);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+}
+html[data-theme="dark"].cur-bg-on .big-search {
+  background: rgba(18, 22, 30, .5);
+}
 `,
     render: function (mount) {
       var box = document.createElement('div');

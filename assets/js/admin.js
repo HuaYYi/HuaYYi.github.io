@@ -95,7 +95,8 @@
     var m = /^data:([\w./+-]+);base64,([\s\S]*)$/.exec(url);
     if (!m) return null;
     var extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
-                   'image/webp': 'webp', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
+                   'image/webp': 'webp', 'image/bmp': 'bmp', 'image/svg+xml': 'svg',
+                   'video/mp4': 'mp4' };
     return { mime: m[1], b64: m[2], ext: extMap[m[1]] || 'png' };
   }
 
@@ -260,10 +261,10 @@
 
   var VIEW_TITLES = { posts: '文章管理', editor: '编辑文章', site: '站点设置',
     pages: '页面管理', 'page-editor': '编辑页面', apps: '应用管理',
-    commit: '提交管理' };
+    'video-tool': '视频压缩工具', commit: '提交管理' };
 
   function showView(name) {
-    ['posts', 'editor', 'site', 'pages', 'page-editor', 'apps', 'commit']
+    ['posts', 'editor', 'site', 'pages', 'page-editor', 'apps', 'video-tool', 'commit']
       .forEach(function (v) {
         $('view-' + v).classList.toggle('hidden', v !== name);
       });
@@ -1091,7 +1092,7 @@
 
     '<section class="site-section">' +
       '<h2>背景设置</h2>' +
-      '<p class="section-hint">粒子动画、图片壁纸、循环视频都已改为「背景类应用」：' +
+      '<p class="section-hint">粒子动画、图片壁纸、动态壁纸都已改为「背景类应用」：' +
       '到「应用管理」编辑——粒子参数在 particles 的「参数」页；壁纸在 wallpapers 的「数据」页上传；' +
       '视频在 videos 的「数据」页登记。各屏使用哪种背景，在「页面管理」对应屏的「背景类型」中选择。</p>' +
     '</section>' +
@@ -3235,6 +3236,32 @@
     };
   }
 
+  /* data/bg-videos.json 提交：行内 __upload（网页压缩成片 dataURL）
+     转 assets/videos/ 下独立 MP4，再剥离 __upload（posterURL 保留供缩略图） */
+  function buildVideoDataCommit(path, op, text) {
+    if (op === 'del' || text == null) return { kind: 'file', path: path, files: [] };
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { return { kind: 'file', path: path, files: [{ path: path, content: text }] }; }
+
+    var extraFiles = [];
+    (data.videos || []).forEach(function (v) {
+      if (typeof v.__upload === 'string' && v.__upload.indexOf('data:video/') === 0) {
+        var parsed = parseDataURL(v.__upload);
+        if (parsed && v.file) {
+          extraFiles.push({ path: v.file, content: parsed.b64, encoding: 'base64' });
+        }
+      }
+      delete v.__upload;
+    });
+
+    return {
+      kind: 'file',
+      path: path,
+      files: [{ path: path, content: JSON.stringify(data, null, 2) + '\n' }].concat(extraFiles)
+    };
+  }
+
   /* ============================================================
      数据编辑器行内图标（2026-09-25）
      编辑过程中就能看到每行图标：网址输入停顿 0.8s 自动匹配；
@@ -3558,22 +3585,32 @@
     '</div>';
   }
 
-  /* 视频行：视频不经浏览器上传（文件大），只登记已放入仓库的路径 */
+  /* 视频行：网页选原片→自动压成 1080p MP4（video-compress.js），
+     __upload = 压缩成片 dataURL（提交时转 assets/videos/ 独立文件并剥离）；
+     posterURL = 首帧海报；路径未压缩前只登记已放入仓库的文件 */
   function videoRowHTML(v) {
     v = v || {};
+    var poster = v.posterURL || '';
     return '<div class="media-row">' +
-      '<div class="media-thumb media-thumb-video"><span class="media-empty">视频</span></div>' +
+      '<div class="media-thumb media-thumb-video">' +
+        (poster ? '<img class="m-thumb-img" src="' + escapeHTML(poster) + '" alt="">'
+                : '<span class="media-empty">视频</span>') +
+      '</div>' +
       '<div class="media-fields">' +
         '<label class="form-field"><span>名称</span>' +
           '<input class="m-name" value="' + escapeHTML(v.name || '') + '" placeholder="便于识别的名称"></label>' +
-        '<label class="form-field"><span>明暗基调</span>' +
+        '<label class="form-field"><span>明暗基调（上传时自动判定）</span>' +
           toneSelectHTML('m-tone', v.tone) + '</label>' +
-        '<label class="form-field"><span>文件路径（请先自行放入 assets/videos/）</span>' +
+        '<label class="form-field"><span>文件路径</span>' +
           '<input class="m-file" value="' + escapeHTML(v.file || '') + '" placeholder="assets/videos/xxx.mp4"></label>' +
       '</div>' +
       '<div class="media-acts">' +
+        '<button type="button" class="btn v-upload">上传视频</button>' +
         '<button type="button" class="btn btn-danger m-del" title="移除登记（不会删除视频文件）">×</button>' +
+        '<span class="v-status"></span>' +
       '</div>' +
+      (v.__upload ? '<input type="hidden" class="v-upload-data" value="' + escapeHTML(v.__upload) + '">' : '') +
+      (v.posterURL ? '<input type="hidden" class="v-poster-data" value="' + escapeHTML(v.posterURL) + '">' : '') +
     '</div>';
   }
 
@@ -3650,6 +3687,70 @@
     });
   }
 
+  /* 视频上传：网页压缩 → 回填路径/tone/成片 dataURL/海报（机制同壁纸） */
+  var videoUploadRow = null;
+  function handleVideoFile(file) {
+    var row = videoUploadRow;
+    videoUploadRow = null;
+    if (!file || !row) return;
+    if (!window.SSBVideo || !SSBVideo.supported()) {
+      toast('当前浏览器不支持网页压缩，请用新版 Chrome/Edge/Safari', true);
+      return;
+    }
+
+    var btn = row.querySelector('.v-upload');
+    var status = row.querySelector('.v-status');
+    btn.disabled = true;
+    status.textContent = '压缩中 0%';
+
+    SSBVideo.compress(file, function (p) {
+      status.textContent = '压缩中 ' + Math.round(p * 100) + '%';
+    }).then(function (r) {
+      /* 原文件名只留英文/数字/点/_-，成品统一 mp4 */
+      var raw = String(file.name || '');
+      var dot = raw.lastIndexOf('.');
+      var stem = (dot > -1 ? raw.slice(0, dot) : raw)
+        .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+      if (!stem) stem = 'vid-' + rand6();
+      var path = 'assets/videos/' + stem + '.mp4';
+      var taken = Array.prototype.map.call(
+        document.querySelectorAll('#ae-videos .m-file'),
+        function (i) { return i.closest('.media-row') === row ? null : i.value.trim(); });
+      if (taken.indexOf(path) > -1) {
+        path = 'assets/videos/' + stem + '-' + rand6() + '.mp4';
+      }
+
+      row.querySelector('.m-file').value = path;
+      row.querySelector('.m-tone').value = r.tone;
+
+      var ensureHidden = function (cls) {
+        var h = row.querySelector('.' + cls);
+        if (!h) {
+          h = document.createElement('input');
+          h.type = 'hidden';
+          h.className = cls;
+          row.appendChild(h);
+        }
+        return h;
+      };
+      ensureHidden('v-upload-data').value = r.dataURL;
+      ensureHidden('v-poster-data').value = r.posterURL;
+
+      var thumbBox = row.querySelector('.media-thumb');
+      thumbBox.innerHTML = '';
+      var img = document.createElement('img');
+      img.className = 'm-thumb-img';
+      img.alt = '';
+      img.src = r.posterURL;
+      thumbBox.appendChild(img);
+
+      status.textContent = Math.round(r.blob.size / 1048576) + 'MB 待提交';
+    }).catch(function (e) {
+      status.textContent = '';
+      toast((e && e.message) || String(e), true);
+    }).then(function () { btn.disabled = false; });
+  }
+
   function renderDataTab(file) {
     var d = adminRegistry[appEdit.id];
     var kind = appDataKind(file);
@@ -3693,10 +3794,12 @@
     } else if (kind === 'videos') {
       var vf = appsData.data[file] || {};
       var vlist = Array.isArray(vf.videos) ? vf.videos : [];
-      html += '<p class="section-hint">视频文件较大，不经浏览器上传：请先自行放入 assets/videos/' +
-        '（建议 mp4，控制在 10MB 内），再在此登记路径。移除条目只清除登记。</p>' +
+      html += '<p class="section-hint">点「上传视频」选择本地原片（手机 4K 也可），' +
+        '网页自动压成 1080p 静音 MP4 并存入 assets/videos/，明暗基调自动判定；' +
+        '也可自行放入文件后只登记路径。移除条目只清除登记。</p>' +
         '<div id="ae-videos">' + vlist.map(videoRowHTML).join('') + '</div>' +
-        '<button type="button" class="btn" id="ae-video-add">＋ 添加视频</button>';
+        '<button type="button" class="btn" id="ae-video-add">＋ 添加视频</button>' +
+        '<input type="file" id="ae-video-file" style="display:none" accept="video/*">';
     } else if (kind === 'colors') {
       var cf = appsData.data[file] || {};
       var clist = Array.isArray(cf.colors) ? cf.colors : [];
@@ -3822,16 +3925,26 @@
       dataOut = Object.assign({}, appsData.data[dataFile] || {}, { wallpapers: wps });
     } else if (kind === 'videos') {
       var vds = [];
+      var vErr = null;
       document.querySelectorAll('#ae-videos .media-row').forEach(function (row) {
         var file = ((row.querySelector('.m-file') || {}).value || '').trim();
-        if (!file) return;
+        if (!file) return;   /* 整行没路径视为空行忽略 */
+        var vup = row.querySelector('.v-upload-data');
+        if (vup && vup.value && vup.value.indexOf('data:video/') !== 0) {
+          vErr = '视频上传数据损坏，请重新上传';
+        }
+        var vposter = row.querySelector('.v-poster-data');
         var vTone = (row.querySelector('.m-tone') || {}).value;
-        vds.push({
+        var item = {
           file: file,
           name: (row.querySelector('.m-name') || {}).value || '',
           tone: vTone === 'light' || vTone === 'dark' ? vTone : ''
-        });
+        };
+        if (vup && vup.value) item.__upload = vup.value;
+        if (vposter && vposter.value) item.posterURL = vposter.value;
+        vds.push(item);
       });
+      if (vErr) return { error: vErr };
       /* 保留 _comment 等表外字段：基于快照浅拷贝，只覆盖 videos 数组 */
       dataOut = Object.assign({}, appsData.data[dataFile] || {}, { videos: vds });
     } else if (kind === 'colors') {
@@ -4682,6 +4795,9 @@
       if (p === 'data/wallpapers.json') {
         return Promise.resolve(buildWallpaperDataCommit(p, ops[p], pendingLocalText(p)));
       }
+      if (p === 'data/bg-videos.json') {
+        return Promise.resolve(buildVideoDataCommit(p, ops[p], pendingLocalText(p)));
+      }
       var content = pendingLocalText(p);
       if (/\.json$/.test(p)) {
         try { content = JSON.stringify(JSON.parse(content), null, 2) + '\n'; } catch (e) {}
@@ -4920,6 +5036,13 @@
       /* 壁纸 / 视频数据行 */
       var mDel = e.target.closest('.m-del');
       if (mDel) { mDel.closest('.media-row').remove(); return; }
+      var vUp = e.target.closest('.v-upload');
+      if (vUp) {
+        videoUploadRow = vUp.closest('.media-row');
+        var vBox = $('ae-video-file');
+        if (vBox) vBox.click();
+        return;
+      }
       var mUp = e.target.closest('.m-upload');
       if (mUp) {
         wallpaperUploadRow = mUp.closest('.media-row');
@@ -4940,12 +5063,18 @@
       }
     });
 
-    /* 文件类选择框：图标压缩走 ae-icon-file；壁纸原图走 ae-wallpaper-file */
+    /* 文件类选择框：图标/视频/壁纸共用 change 委托，各自压缩处理 */
     $('ae-data').addEventListener('change', function (e) {
       if (e.target.id === 'ae-icon-file') {
         var file = e.target.files && e.target.files[0];
         e.target.value = '';   /* 选同一个文件也要能再次触发 change */
         handleIconFile(file);
+        return;
+      }
+      if (e.target.id === 'ae-video-file') {
+        var vfile = e.target.files && e.target.files[0];
+        e.target.value = '';
+        handleVideoFile(vfile);
         return;
       }
       if (e.target.id === 'ae-wallpaper-file') {

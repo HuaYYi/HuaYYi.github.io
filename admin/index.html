@@ -29,6 +29,9 @@
         <a href="javascript:;" class="nav-item" data-view="apps">
           <span class="nav-icon">🧩</span>应用管理
         </a>
+        <a href="javascript:;" class="nav-item" data-view="video-tool">
+          <span class="nav-icon">🎬</span>视频压缩
+        </a>
         <a href="javascript:;" class="nav-item" id="nav-commit" data-view="commit">
           <span class="nav-icon">🚀</span>提交管理
         </a>
@@ -282,6 +285,87 @@
           </div>
         </section>
 
+        <!-- 视图：视频压缩工具（本机网页压缩，压完下载） -->
+        <section class="view hidden" id="view-video-tool">
+          <div class="card vt-card">
+            <!-- 拖放 / 选择 -->
+            <div class="vt-drop" id="vt-drop">
+              <div class="vt-drop-ic">🎬</div>
+              <p class="vt-drop-title">拖放视频到此处，或点按钮选择</p>
+              <p class="vt-drop-sub">支持 MP4 / MOV / WebM，最大 500MB；全程在本机浏览器处理，不上传服务器</p>
+              <button type="button" class="btn btn-primary" id="vt-pick">选择视频文件</button>
+              <input type="file" id="vt-file" accept="video/*" hidden>
+            </div>
+
+            <!-- 选完文件：预览 + 参数 + 预估 -->
+            <div class="vt-work hidden" id="vt-work">
+              <div class="vt-src">
+                <video id="vt-preview" muted playsinline controls></video>
+                <div class="vt-src-info" id="vt-src-info"></div>
+              </div>
+
+              <div class="vt-grid">
+                <label class="form-field">
+                  <span>视频压缩质量</span>
+                  <select id="vt-quality">
+                    <option value="high">高质量（轻微压缩）</option>
+                    <option value="standard" selected>标准（推荐）</option>
+                    <option value="small">较小体积</option>
+                    <option value="tiny">极小体积</option>
+                  </select>
+                </label>
+                <label class="form-field">
+                  <span>分辨率</span>
+                  <select id="vt-resolution">
+                    <option value="0" selected>保持原始</option>
+                    <option value="2160">2160p（4K）</option>
+                    <option value="1440">1440p（2K）</option>
+                    <option value="1080">1080p</option>
+                    <option value="720">720p</option>
+                    <option value="480">480p</option>
+                  </select>
+                </label>
+                <label class="form-field">
+                  <span>帧率</span>
+                  <select id="vt-fps">
+                    <option value="0" selected>保持原始</option>
+                    <option value="60">60 fps</option>
+                    <option value="30">30 fps</option>
+                    <option value="24">24 fps</option>
+                    <option value="15">15 fps</option>
+                  </select>
+                </label>
+                <label class="form-field">
+                  <span>倍速</span>
+                  <select id="vt-speed">
+                    <option value="0.5">0.5×（放慢）</option>
+                    <option value="1" selected>1×（原速）</option>
+                    <option value="1.25">1.25×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="2">2×（加速）</option>
+                  </select>
+                </label>
+                <label class="form-field">
+                  <span>视频输出格式</span>
+                  <select id="vt-format"></select>
+                </label>
+              </div>
+
+              <div class="vt-analysis" id="vt-analysis"></div>
+              <div class="vt-progress hidden" id="vt-progress">
+                <div class="vt-bar"><i id="vt-bar-fill"></i></div>
+                <span id="vt-pct">0%</span>
+              </div>
+              <div class="vt-result hidden" id="vt-result"></div>
+
+              <div class="vt-actions">
+                <button type="button" class="btn btn-primary" id="vt-start">开始压缩</button>
+                <button type="button" class="btn" id="vt-reset">重新选择</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- 视图六：提交管理（本地改动 → 选择性提交 GitHub） -->
         <section class="view hidden" id="view-commit">
           <div class="action-row">
@@ -336,6 +420,11 @@
 
   <!-- 仅复用 apps.js 的纯数据逻辑（板块注册表 / v2→v3 迁移），不触发前台渲染 -->
   <script src="../assets/js/apps.js"></script>
+  <!-- 视频压缩：mp4/webm 封包库 + 压缩模块 + 压缩工具界面，先于 admin.js 加载 -->
+  <script src="../assets/js/vendor/mp4-muxer.js"></script>
+  <script src="../assets/js/vendor/webm-muxer.js"></script>
+  <script src="../assets/js/video-compress.js"></script>
+  <script src="../assets/js/video-tool.js"></script>
   <script src="../assets/js/admin.js"></script>
 </body>
 </html>

@@ -842,10 +842,13 @@
         state.layer.dataset.bgApp = '';
         state.layer.dataset.bgVariant = '';
         state.layer.classList.add('screen-bg-empty');
+        if (state.section) state.section.classList.remove('bg-active');
         return resolved;
       }
       state.layer.dataset.bgApp = resolved.app;
       state.layer.dataset.bgVariant = resolved.variant || '';
+      /* 该屏背景真正生效：bg-active 驱动「铺满头部后面 + 组件半透明」 */
+      if (state.section) state.section.classList.add('bg-active');
 
       var def = window.SSBApps.registry[resolved.app];
       /* 背景应用参数两层合并：schema 默认 ∪ pages.json 顶层 apps[id]（无实例） */
@@ -903,6 +906,33 @@
     });
   }
 
+  /* 当前停留屏观察器：头部正下方一窄条为观测带，哪一屏穿过它即当前屏。
+     <html>.cur-bg-on 只在当前屏 bg-active 时开启，滚动跨屏自动切换 */
+  var curSection = null, curObserver = null;
+  function syncCurBg() {
+    var on = !!(curSection && curSection.classList.contains('bg-active'));
+    document.documentElement.classList.toggle('cur-bg-on', on);
+  }
+  function setupCurrentObserver(sections) {
+    if (curObserver) { curObserver.disconnect(); curObserver = null; }
+    curSection = sections.length ? sections[0] : null;
+    if (typeof IntersectionObserver === 'undefined') return;
+    /* 各目标 intersecting 状态表：观测带并非零高，平滑滚动跨边界帧里
+       相邻两屏可能同时压在带上，且某目标的 false/true 会在同帧合并、
+       不再单独交付。因此不能「见到 true 才选中」——旧目标退出时，
+       本已 true 的另一目标不会重新发 true，当前屏会卡死。每次回调
+       都按完整状态重选：多个命中取文档顺序靠后者（更深的一屏） */
+    var flags = new Map();
+    curObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { flags.set(en.target, en.isIntersecting); });
+      var pick = null;
+      sections.forEach(function (s) { if (flags.get(s)) pick = s; });
+      if (pick) curSection = pick;
+      syncCurBg();
+    }, { rootMargin: '-64px 0px -90% 0px', threshold: 0 });
+    sections.forEach(function (s) { curObserver.observe(s); });
+  }
+
   /* 初始化当前页所有屏背景（apps.js 渲染完触发事件，detail.globalApps
      提供背景应用全局参数） */
   function initScreenBackgrounds(detail) {
@@ -920,7 +950,11 @@
         ctl: null, resolved: null
       };
     });
-    return applyAllLayers();
+    /* 观察全部屏（含无背景层的屏），否则滚到无背景屏时当前屏不更新；
+       cur-bg-on 是否开启由该屏 bg-active 决定 */
+    var secs = Array.prototype.slice.call(document.querySelectorAll('.page-screen'));
+    setupCurrentObserver(secs);
+    return applyAllLayers().then(function () { syncCurBg(); });
   }
 
   /* 右键菜单：写访客偏好后重新应用全部层 */
