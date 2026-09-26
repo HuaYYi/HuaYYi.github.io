@@ -296,8 +296,11 @@ html[data-theme="dark"] .nav-zone {
           state.data = groups;
           state.tab = 0;
           state.page = 0;
-          updatePerPage(state);
+          /* 顺序契约：必须先建 shell 再算每页数量——updatePerPage 要读
+             .nav-cards 上的 --nav-cols（媒体查询决定列数）。顺序反了元素
+             不存在会静默回退 6 列，导致窄屏初始加载页数不全 */
           buildNavShell(state);
+          updatePerPage(state);
           renderNavPage(state);
 
           /* 窗口尺寸变化：所有实例重新算每页数量并回到首页（全页只绑一次） */
@@ -320,7 +323,8 @@ html[data-theme="dark"] .nav-zone {
     }
   });
 
-  /* 从某实例 .nav-cards 的 CSS 变量读取当前列数（媒体查询控制），乘配置行数 */
+  /* 从某实例 .nav-cards 的 CSS 变量读取当前列数（媒体查询控制），乘配置行数。
+     调用方必须保证已先执行 buildNavShell（见 render 里的顺序契约） */
   function updatePerPage(state) {
     var cols = 6;
     var rows = Number(state.cfg.perPageRows) || 2;
@@ -329,6 +333,10 @@ html[data-theme="dark"] .nav-zone {
       var colsRaw = getComputedStyle(cardEl).getPropertyValue('--nav-cols').trim();
       var n = parseInt(colsRaw, 10);
       if (n && n > 0) cols = n;
+    } else {
+      /* 防御：元素缺失说明调用顺序错了——绝不再静默回退（初始窄屏页数
+         丢失 bug 的根因），留默认值兜底同时把问题暴露到控制台 */
+      console.warn('nav: updatePerPage 在 buildNavShell 之前被调用，列数回退默认值 6');
     }
     state.perPage = cols * rows;
   }
