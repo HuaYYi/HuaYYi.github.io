@@ -238,8 +238,17 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 .page-tpl-list .page-screen:not(.is-full) .screen-inner { --scr-padt: 44px; }
 .page-tpl-content .page-screen:not(.is-full) .screen-inner { --scr-padt: 24px; }
 
-/* 页面标题（非 landing 第一屏）：全宽独立于九宫格，避免被 align-items 收缩 */
+/* 页面标题（非 landing）：默认由 apps.js 放进第一个盒子，与正文同宽同左缘；
+   无盒兜底时挂屏级，stretch 保证占满屏内宽不被九宫格 align-items 收缩 */
 .page-heading { margin-top: 0; align-self: stretch; }
+/* 标题进盒后：下边距清零，改由盒子的 gap（默认 16px）统一控制标题与
+   应用的间距，避免 margin-bottom(post 18/archive 22) 与 gap 双重叠加 */
+.page-box > .page-heading { margin-bottom: 0; }
+/* rich-content 的首个 <p> 自带段落上边距（18px，服务于段落流）；它作为
+   flex 子项的后代，边距不与盒 gap 折叠会叠成 34px 偏松。仅在「盒内首个
+   应用」场景归零首个块元素，让 box gap 成为唯一间距来源。
+   作用域刻意收窄，不影响真实文章页的段落折叠行为 */
+.page-box > .app:first-of-type .post-content > :first-child { margin-top: 0; }
 
 /* 盒子：宽度 + 水平对齐 + 内边距/垂直间距（后台可调，默认 0/0/16px）；
    min() 保证窄屏永远不溢出内边距区 */
@@ -658,8 +667,10 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
     flex-direction: column;
     justify-content: center;
   }
+  /* 窄屏多为手机/平板，没有 Ctrl/⌘+D 这类键盘收藏方式，
+     提示无意义反而占地方——隐藏收藏提示，横条只留邮箱等社交按钮 */
   .footer-collect {
-    justify-content: center;
+    display: none;
   }
 }
 

@@ -39,26 +39,11 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1600);
   }
 
-  /* ---------- 剪贴板：优先 Clipboard API，降级 execCommand ---------- */
+  /* ---------- 剪贴板：复制逻辑统一走 BlogUtils.copyText（含降级） ---------- */
   function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).then(
-        function () { toast('已复制'); },
-        function () { fallbackCopy(text); }
-      );
-    }
-    fallbackCopy(text);
-    return Promise.resolve();
-  }
-  function fallbackCopy(text) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); toast('已复制'); }
-    catch (e) { toast('复制失败，请手动复制'); }
-    ta.remove();
+    window.BlogUtils.copyText(text).then(function (ok) {
+      toast(ok ? '已复制' : '复制失败，请手动复制');
+    });
   }
 
   /* ---------- 菜单 DOM 构建 ---------- */

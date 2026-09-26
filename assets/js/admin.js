@@ -18,11 +18,7 @@
 
   /* ---------- 可调整的内部配置 ---------- */
   var INTERNAL = {
-    toastMs: 2600,             /* Toast 轻提示自动关闭毫秒 */
-    maxSearchResults: 8,      /* 列表页 / 归档页搜索结果上限 */
-    contentRoot: 'assets/images/',   /* 上传图片在仓库内的目录前缀 */
-    textEncoding: 'utf-8',    /* 文本文件提交默认编码 */
-    blobTimeout: 60000        /* 单次 blob 提交请求超时（ms） */
+    toastMs: 2600              /* Toast 轻提示自动关闭毫秒 */
   };
 
   /* ---------------- 状态 ---------------- */
@@ -307,7 +303,9 @@
       repoPostsCache = list.slice();   /* 本地合并前的仓库基线 */
       /* 把浏览器里保存的本地文章并入列表。
          按 file 去重：正在本地编辑的线上文章由本地条目覆盖，
-         避免同一篇文章出现两行（提交后本地条目清除即回落仓库版本） */
+         避免同一篇文章出现两行（提交后本地条目清除即回落仓库版本）。
+         与前台 common.js 的同名逻辑重复，但后台不加载 common.js，
+         跨文件抽取反而够不到（曾因此回归，见 C5 教训） */
       var localMap = {};
       readLocalList().forEach(function (p) {
         p.local = true;
@@ -403,12 +401,13 @@
       }
       var contentEl = doc.querySelector('.post-content');
 
-      /* 用 JSON 中的元数据，列表项兜底 */
+      /* 表单只认文件内 post-data；列表项不再作为字段兜底（旧文章数据不齐
+         就在编辑器里显空，保存时以填写值为准） */
       var item = postsCache.filter(function (p) { return p.file === file; })[0] || {};
-      $('f-title').value = meta.title || item.title || '';
+      $('f-title').value = meta.title || '';
       $('f-slug').value = file.replace(/\.html$/, '');
-      $('f-date').value = meta.date || item.date || todayStr();
-      $('f-category').value = meta.category || item.category || '';
+      $('f-date').value = meta.date || '';
+      $('f-category').value = meta.category || '';
       $('f-summary').value = item.summary || '';
 
       /* 封面：远程路径 */
@@ -1005,16 +1004,22 @@
     return '<span class="ri-box" data-state="empty"><span class="ri-letter">?</span></span>';
   }
 
-  function engineRowHTML(e) {
-    e = e || {};
+  /* 带站点图标的结构化行（搜索引擎 + 导航链接共用）：图标格 + 名称 + URL +
+     重试/上传/删除，仅占位符随场景不同 */
+  function iconSiteRowHTML(item, namePh, urlPh) {
+    item = item || {};
     return '<div class="repeat-row">' +
-      riBoxHTML(e) +
-      '<input class="r-name" placeholder="名称，如：百度" value="' + escapeHTML(e.name) + '">' +
-      '<input class="r-url" placeholder="搜索 URL 前缀，如 https://www.baidu.com/s?wd=" value="' + escapeHTML(e.url) + '">' +
+      riBoxHTML(item) +
+      '<input class="r-name" placeholder="' + namePh + '" value="' + escapeHTML(item.name) + '">' +
+      '<input class="r-url" placeholder="' + urlPh + '" value="' + escapeHTML(item.url) + '">' +
       '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
       '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 32×32 WebP">上传</button>' +
       '<button type="button" class="btn btn-danger row-del">删除</button>' +
     '</div>';
+  }
+
+  function engineRowHTML(e) {
+    return iconSiteRowHTML(e, '名称，如：百度', '搜索 URL 前缀，如 https://www.baidu.com/s?wd=');
   }
 
   function socialRowHTML(s) {
@@ -1031,15 +1036,7 @@
   }
 
   function navLinkRowHTML(l) {
-    l = l || {};
-    return '<div class="repeat-row">' +
-      riBoxHTML(l) +
-      '<input class="r-name" placeholder="网站名称" value="' + escapeHTML(l.name) + '">' +
-      '<input class="r-url" placeholder="网址，如 https://www.baidu.com/" value="' + escapeHTML(l.url) + '">' +
-      '<button type="button" class="btn btn-link icon-retry" title="网站更新图标后，强制重新抓取并替换；抓取失败保留原图">重试</button>' +
-      '<button type="button" class="btn btn-link icon-upload" title="自动匹配不到时可上传本地图标，会自动压成 32×32 WebP">上传</button>' +
-      '<button type="button" class="btn btn-danger row-del">删除</button>' +
-    '</div>';
+    return iconSiteRowHTML(l, '网站名称', '网址，如 https://www.baidu.com/');
   }
 
   function navGroupHTML(g) {
@@ -1208,13 +1205,6 @@
     return { rows: rows, bad: bad };
   }
 
-  function numClamp(id, min, max, dft, label) {
-    var v = parseFloat($(id).value);
-    if (isNaN(v)) return { value: dft };
-    if (v < min || v > max) return { error: label + '需要在 ' + min + ' ~ ' + max + ' 之间' };
-    return { value: v };
-  }
-
   function collectSiteData() {
     var c = JSON.parse(JSON.stringify(siteData.config || {}));  /* 深拷贝，保留 repo/_comment 等表外字段 */
 
@@ -1363,8 +1353,8 @@
   }
 
   function emptyScreen(tpl) {
-    return { bg: { type: 'default' },
-             vAlign: tpl === 'landing' ? 'center' : 'start',
+    /* 无背景的屏不带 bg 字段（与 apps.js 新约定一致） */
+    return { vAlign: tpl === 'landing' ? 'center' : 'start',
              boxes: [emptyBox(tpl)] };
   }
 
@@ -1377,21 +1367,21 @@
     }
     if (tpl === 'landing') {
       return [
-        { bg: { type: 'particles' }, vAlign: 'center', boxes: [
+        { bg: { app: 'particles' }, vAlign: 'center', boxes: [
           { width: '1000px', hAlign: 'center', apps: [
             inst('quote'), inst('search'), inst('nav')] }
         ] },
-        { bg: { type: 'none' }, vAlign: 'start', boxes: [
+        { vAlign: 'start', boxes: [
           { width: '760px', hAlign: 'center', apps: [
             inst('posts', { title: '最新文章' })] }
         ] }
       ];
     }
     if (tpl === 'content') {
-      return [{ bg: { type: 'none' }, vAlign: 'start', boxes: [
+      return [{ vAlign: 'start', boxes: [
         { width: '740px', hAlign: 'center', apps: [inst('rich-content', { html: '' })] }] }];
     }
-    return [{ bg: { type: 'none' }, vAlign: 'start', boxes: [
+    return [{ vAlign: 'start', boxes: [
       { width: '760px', hAlign: 'center', apps: [inst('archive-list')] }] }];
   }
 
@@ -1548,6 +1538,45 @@
     '</div>';
   }
 
+  /* 读取一条响应式规则行（屏/盒附件编辑器与模板库编辑器共用）：
+     校验失败 throw（errPrefix 拼错误归属，如「模板」/「盒子的响应式」）；
+     整档留空或属性被 sanitizeRule 剥光 → 返回 null，调用方跳过 */
+  function readRuleRow(row, i, level, errPrefix) {
+    var r = {};
+    var hasAny = false;
+    var maxRaw = row.querySelector('.pe-r-max').value.trim();
+    row.querySelectorAll('.pe-r-num').forEach(function (inp) {
+      if (inp.value.trim() === '') return;
+      hasAny = true;
+      var n = Number(inp.value);
+      if (isNaN(n) || n < 0 || n > 9999) {
+        throw new Error(errPrefix + '第 ' + (i + 1) + ' 档数值需为 0~9999');
+      }
+      r[inp.dataset.k] = n;
+    });
+    var w = row.querySelector('.pe-r-width');
+    if (w && w.value.trim() !== '') {
+      hasAny = true;
+      var s = w.value.trim();
+      if (!/^\d+(\.\d+)?(px|%)$/.test(s)) {
+        throw new Error(errPrefix + '第 ' + (i + 1) + ' 档宽度格式应为 1000px 或 92%');
+      }
+      r.width = s;
+    }
+    row.querySelectorAll('.pe-r-sel').forEach(function (sel) {
+      if (sel.value) { hasAny = true; r[sel.dataset.k] = sel.value; }
+    });
+    var hid = row.querySelector('.pe-r-hidden');
+    if (hid && hid.checked) { hasAny = true; r.hidden = true; }
+    if (!hasAny && maxRaw === '') return null;
+    var max = Number(maxRaw);
+    if (isNaN(max) || max <= 0 || max > 99999) {
+      throw new Error(errPrefix + '第 ' + (i + 1) + ' 档断点宽度需为正整数');
+    }
+    r.max = Math.round(max);
+    return window.SSBApps.sanitizeRule(level, r);
+  }
+
   /* 读取一个挂载控件：返回 undefined（无）/ 'tpl:id' / {rules}。
      行校验失败 throw Error，由 syncPageEditor 统一捕获转保存错误 */
   function readRespAttach(container, where) {
@@ -1557,41 +1586,7 @@
     var rules = [];
     var rows = container.querySelectorAll('.pe-resp-row');
     for (var i = 0; i < rows.length; i++) {
-      var row = rows[i];
-      var get = function (cls) { return row.querySelector(cls); };
-      var maxRaw = get('.pe-r-max').value.trim();
-      var r = {};
-      var hasAny = false;
-      row.querySelectorAll('.pe-r-num').forEach(function (inp) {
-        if (inp.value.trim() === '') return;
-        hasAny = true;
-        var n = Number(inp.value);
-        if (isNaN(n) || n < 0 || n > 9999) {
-          throw new Error(where + '的响应式第 ' + (i + 1) + ' 档：数值需为 0~9999');
-        }
-        r[inp.dataset.k] = n;
-      });
-      var w = get('.pe-r-width');
-      if (w && w.value.trim() !== '') {
-        hasAny = true;
-        var s = w.value.trim();
-        if (!/^\d+(\.\d+)?(px|%)$/.test(s)) {
-          throw new Error(where + '的响应式第 ' + (i + 1) + ' 档宽度格式应为 1000px 或 92%');
-        }
-        r.width = s;
-      }
-      row.querySelectorAll('.pe-r-sel').forEach(function (sel) {
-        if (sel.value) { hasAny = true; r[sel.dataset.k] = sel.value; }
-      });
-      var hid = get('.pe-r-hidden');
-      if (hid && hid.checked) { hasAny = true; r.hidden = true; }
-      if (!hasAny && maxRaw === '') continue;   /* 整档留空 = 忽略 */
-      var max = Number(maxRaw);
-      if (isNaN(max) || max <= 0 || max > 99999) {
-        throw new Error(where + '的响应式第 ' + (i + 1) + ' 档断点宽度需为正整数');
-      }
-      r.max = Math.round(max);
-      var clean = window.SSBApps.sanitizeRule(container.dataset.level, r);
+      var clean = readRuleRow(rows[i], i, container.dataset.level, where + '的响应式');
       if (clean) rules.push(clean);
     }
     return rules.length ? { rules: rules } : undefined;
@@ -1675,34 +1670,7 @@
     var rules = [];
     var rows = ed.querySelectorAll('#tpl-rules .pe-resp-row');
     for (var i = 0; i < rows.length; i++) {
-      var row = rows[i];
-      var r = {};
-      var hasAny = false;
-      var maxRaw = row.querySelector('.pe-r-max').value.trim();
-      row.querySelectorAll('.pe-r-num').forEach(function (inp) {
-        if (inp.value.trim() === '') return;
-        hasAny = true;
-        var n = Number(inp.value);
-        if (isNaN(n) || n < 0 || n > 9999) throw new Error('第 ' + (i + 1) + ' 档数值需为 0~9999');
-        r[inp.dataset.k] = n;
-      });
-      var w = row.querySelector('.pe-r-width');
-      if (w && w.value.trim() !== '') {
-        hasAny = true;
-        var s = w.value.trim();
-        if (!/^\d+(\.\d+)?(px|%)$/.test(s)) throw new Error('第 ' + (i + 1) + ' 档宽度格式应为 1000px 或 92%');
-        r.width = s;
-      }
-      row.querySelectorAll('.pe-r-sel').forEach(function (sel) {
-        if (sel.value) { hasAny = true; r[sel.dataset.k] = sel.value; }
-      });
-      var hid = row.querySelector('.pe-r-hidden');
-      if (hid && hid.checked) { hasAny = true; r.hidden = true; }
-      if (!hasAny && maxRaw === '') continue;
-      var max = Number(maxRaw);
-      if (isNaN(max) || max <= 0 || max > 99999) throw new Error('第 ' + (i + 1) + ' 档断点宽度需为正整数');
-      r.max = Math.round(max);
-      var clean = window.SSBApps.sanitizeRule(level, r);
+      var clean = readRuleRow(rows[i], i, level, '');
       if (clean) rules.push(clean);
     }
     if (!rules.length) throw new Error('模板至少要有一档有效规则（填断点宽度 + 至少一个属性）');
@@ -1740,7 +1708,6 @@
 
   var ALIGN_PAIRS = [['left', '左对齐'], ['center', '居中'], ['right', '右对齐']];
   var VALIGN_PAIRS = [['start', '靠上'], ['center', '上下居中'], ['end', '靠下']];
-  var HALIGN_PAIRS = [['left', '左对齐'], ['center', '居中'], ['right', '右对齐']];
   /* v4：屏背景类型改为后台背景应用清单动态生成，不再有写死的类型对 */
   var ORDER_PAIRS = [['newest', '最新在前'], ['oldest', '最早在前']];
   var GROUP_PAIRS = [['year', '按年 → 月'], ['month', '按年-月'], ['flat', '平铺不分组']];
@@ -1905,8 +1872,8 @@
     return html + '</div>';
   }
 
-  function screenEditorHTML(p, sc, si) {
-    var multi = p.screens.length > 1;
+  function screenEditorHTML(p, sc, si, screenCount) {
+    var multi = screenCount > 1;
     /* v4 屏背景为「背景应用」：{app, variant?}；开关只认 app 非空 */
     var bgApp = (sc.bg && sc.bg.app) || '';
     var bgOn = !!bgApp;
@@ -1935,9 +1902,9 @@
           '<button type="button" class="btn pe-mini" data-act="sc-up" title="上移" ' +
             (si === 0 ? 'disabled' : '') + '>↑</button>' +
           '<button type="button" class="btn pe-mini" data-act="sc-down" title="下移" ' +
-            (si === p.screens.length - 1 ? 'disabled' : '') + '>↓</button>' +
+            (si === screenCount - 1 ? 'disabled' : '') + '>↓</button>' +
           '<button type="button" class="btn btn-danger pe-mini" data-act="sc-del" title="删除本屏" ' +
-            (p.screens.length === 1 ? 'disabled' : '') + '>×</button>' +
+            (screenCount === 1 ? 'disabled' : '') + '>×</button>' +
         '</span>' +
       '</div>' +
       '<div class="form-grid form-grid-3 pe-sc-grid">' +
@@ -1973,6 +1940,14 @@
     if (!p) { box.innerHTML = ''; return; }
     var builtin = isBuiltinPage(p);
 
+    /* 无 screens 的异常数据：编辑器就地兜底出一屏（保存时自然补进数据），
+       不在读取层改写原数据 */
+    var pScreens = (p.screens && p.screens.length)
+      ? p.screens : [emptyScreen(p.template)];
+    var screenCards = pScreens.map(function (sc, si) {
+      return screenEditorHTML(p, sc, si, pScreens.length);
+    }).join('');
+
     var html = '<div class="card pe-card pe-meta">' +
       '<h2>页面信息</h2>' +
       '<div class="form-grid form-grid-3">' +
@@ -1984,10 +1959,13 @@
         '<label class="form-field"><span>页面模板' + (builtin ? '（落地页锁定）' : '') + '</span>' +
           '<select class="pe-template"' + (builtin ? ' disabled' : '') + '>' +
             tplOptions(p.template, builtin) + '</select></label>' +
+        '<label class="form-field checkbox-field">' +
+          '<input type="checkbox" class="pe-showtitle"' + (p.showTitle === true ? ' checked' : '') + '>' +
+          '<span>显示页面大标题 h1</span></label>' +
       '</div>' +
       '<p class="pe-file-hint">' + pageFileHint(p) + '</p>' +
     '</div>' +
-    p.screens.map(function (sc, si) { return screenEditorHTML(p, sc, si); }).join('') +
+    screenCards +
     '<div class="pe-add-screen-row">' +
       '<button type="button" class="btn" data-act="sc-add">＋ 添加一屏</button>' +
       '<span class="pe-add-hint">超过一屏后，前台各屏整屏展示并支持滚动吸附，屏底出现下滑动画按钮</span>' +
@@ -2022,6 +2000,8 @@
 
     try {
       p.title = root.querySelector('.pe-title').value.trim();
+      /* 大标题显隐：编辑器始终写显式布尔值，页面配置不再依赖模板隐式推导 */
+      p.showTitle = root.querySelector('.pe-showtitle').checked;
       /* 内置页模板 select 被禁用，值仍可读；自建页正常更新 */
       p.template = root.querySelector('.pe-template').value;
       var idEl = root.querySelector('.pe-id');
@@ -2031,14 +2011,14 @@
       var scEls = root.querySelectorAll('.pe-screen');
       for (var s = 0; s < scEls.length; s++) {
         var scEl = scEls[s];
-        /* 背景开关关闭={type:'none'}；开启={app, variant?}（变体仅对有变体的应用收集） */
+        /* 背景开关开启={app, variant?}；关闭=不带 bg 字段 */
         var bgOn = scEl.querySelector('.pe-bgon').checked;
         /* 九宫格当前格：一格同时定垂直与水平 */
         var g9 = scEl.querySelector('.pe-grid9 .on');
-        var sc = { bg: bgOn ? { app: scEl.querySelector('.pe-bgtype').value } : { type: 'none' },
-                   vAlign: g9 ? g9.dataset.v : 'start',
+        var sc = { vAlign: g9 ? g9.dataset.v : 'start',
                    hAlign: g9 ? g9.dataset.h : 'center',
                    boxes: [] };
+        if (bgOn) sc.bg = { app: scEl.querySelector('.pe-bgtype').value };
         var vwrap = scEl.querySelector('.pe-bgvariant-wrap');
         if (bgOn && !vwrap.classList.contains('hidden')) {
           var bgVariantVal = scEl.querySelector('.pe-bgvariant').value;
@@ -2368,12 +2348,14 @@
       return;
     }
 
-    /* v3：新页面直接带默认屏/盒/板块结构；file 留空走动态页 page.html?slug= */
+    /* v3：新页面直接带默认屏/盒/板块结构；file 留空走动态页 page.html?slug=。
+       showTitle 新建页默认显示，后台可随时关闭 */
     var np = {
       id: slug,
       title: title,
       template: tpl,
       file: '',
+      showTitle: true,
       screens: defaultScreens(tpl)
     };
 
@@ -2750,7 +2732,6 @@
     var captured = null;
     var fakeSSB = {
       define: function (d) { captured = d; },
-      register: function (d) { captured = d; },
       navGo: function () {}
     };
     var fn;
@@ -3202,17 +3183,14 @@
     var seenIcon = {};
     iconDataItems(data, kind).forEach(function (it) {
       if (typeof it.__icon === 'string' &&
-          it.__icon.indexOf('data:image/') === 0) {
-        /* 扩展名以 dataURL 实际类型为准：新图标是 webp，
-           兼容本次改动前已暂存在 localStorage 的 png dataURL */
-        var parsed = parseDataURL(it.__icon);
+          it.__icon.indexOf('data:image/webp') === 0) {
+        /* 图标统一 32×32 WebP，提交路径扩展名固定；同域名只上传一次 */
         var host = itemHost(it);
-        /* 同域名只上传一次（多分类出现同一站时） */
-        if (parsed && host && !seenIcon[host]) {
+        if (host && !seenIcon[host]) {
           seenIcon[host] = 1;
           extraFiles.push({
-            path: 'assets/icons/sites/' + host + '.' + parsed.ext,
-            content: parsed.b64,
+            path: 'assets/icons/sites/' + host + '.webp',
+            content: it.__icon.slice(it.__icon.indexOf(',') + 1),
             encoding: 'base64'
           });
         }
@@ -3542,6 +3520,17 @@
   /* 当前等待接收上传图片的壁纸行（点「上传壁纸」时记下，文件选择回调里用） */
   var wallpaperUploadRow = null;
 
+  /* 明暗基调下拉（壁纸/视频/颜色三类行共用）：
+     cls=收集时绑定的 class 名；tone=当前值（''=无，不锁定主题）。
+     选项文案统一在此维护，三处不再各拼一份 */
+  function toneSelectHTML(cls, tone) {
+    return '<select class="' + cls + '">' +
+      '<option value=""' + (!tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
+      '<option value="light"' + (tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
+      '<option value="dark"' + (tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
+    '</select>';
+  }
+
   /* 壁纸行：缩略图 + 名称/明暗/路径 + 上传。
      __upload 是上传图的临时 dataURL（提交时转 assets/wallpapers/ 独立图片并剥离，同图标机制）；
      上传时已压成 WebP（长边≤2560，GIF/SVG 直通）——壁纸是全屏图，不用图标那套 32px 压缩 */
@@ -3557,11 +3546,7 @@
         '<label class="form-field"><span>名称</span>' +
           '<input class="m-name" value="' + escapeHTML(w.name || '') + '" placeholder="便于识别的名称"></label>' +
         '<label class="form-field"><span>明暗基调</span>' +
-          '<select class="m-tone">' +
-            '<option value=""' + (!w.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
-            '<option value="light"' + (w.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
-            '<option value="dark"' + (w.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
-          '</select></label>' +
+          toneSelectHTML('m-tone', w.tone) + '</label>' +
         '<label class="form-field"><span>文件路径</span>' +
           '<input class="m-file" value="' + escapeHTML(w.file || '') + '" placeholder="assets/wallpapers/xxx.webp"></label>' +
       '</div>' +
@@ -3582,11 +3567,7 @@
         '<label class="form-field"><span>名称</span>' +
           '<input class="m-name" value="' + escapeHTML(v.name || '') + '" placeholder="便于识别的名称"></label>' +
         '<label class="form-field"><span>明暗基调</span>' +
-          '<select class="m-tone">' +
-            '<option value=""' + (!v.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
-            '<option value="light"' + (v.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
-            '<option value="dark"' + (v.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
-          '</select></label>' +
+          toneSelectHTML('m-tone', v.tone) + '</label>' +
         '<label class="form-field"><span>文件路径（请先自行放入 assets/videos/）</span>' +
           '<input class="m-file" value="' + escapeHTML(v.file || '') + '" placeholder="assets/videos/xxx.mp4"></label>' +
       '</div>' +
@@ -3613,11 +3594,7 @@
         '<label class="form-field"><span>颜色值 / 渐变（none = 无背景）</span>' +
           '<input class="c-value" value="' + escapeHTML(c.value || '') + '" placeholder="#ffffff 或 linear-gradient(135deg,#74ebd5,#9face6)"></label>' +
         '<label class="form-field"><span>明暗基调</span>' +
-          '<select class="c-tone">' +
-            '<option value=""' + (!c.tone ? ' selected' : '') + '>无（不锁定主题）</option>' +
-            '<option value="light"' + (c.tone === 'light' ? ' selected' : '') + '>亮（锁定亮色）</option>' +
-            '<option value="dark"' + (c.tone === 'dark' ? ' selected' : '') + '>暗（锁定暗色）</option>' +
-          '</select></label>' +
+          toneSelectHTML('c-tone', c.tone) + '</label>' +
       '</div>' +
       '<div class="media-acts">' +
         '<button type="button" class="btn btn-danger m-del" title="移除该颜色">×</button>' +
@@ -4524,7 +4501,7 @@
   /* 干净的列表条目（去掉 local 等本地标志） */
   function cleanPostEntry(p, cover) {
     return {
-      title: p.title, date: p.date, updated: p.updated || p.date,
+      title: p.title, date: p.date, updated: p.updated,
       file: p.file, summary: p.summary || '', category: p.category || '',
       cover: cover != null ? cover : (p.cover || '')
     };
@@ -4587,7 +4564,7 @@
     var meta = {
       title: item.title,
       date: item.date,
-      updated: item.updated || item.date,
+      updated: item.updated,
       category: item.category || '',
       cover: finalCover
     };
@@ -4597,8 +4574,7 @@
   }
 
   /* data/pages.json → 提交文件：富文本图片抽出上传。
-     自建页统一走动态页 page.html?slug=（file 为空），不生成静态外壳；
-     仓库基线中残留的旧 page-*.html 外壳（旧工作流产物）随本次提交删除 */
+     自建页统一走动态页 page.html?slug=（file 为空），不生成静态外壳 */
   function buildPagesCommit() {
     var data = JSON.parse(pendingLocalText('data/pages.json'));
     var clone = JSON.parse(JSON.stringify(data));
@@ -4606,22 +4582,9 @@
     var uploads = collectRichImageUploads(clone.pages || []);
     applyRichImageReplacements(clone.pages || [], uploads.map);
 
-    var basePageFiles = [];
-    if (commitBase['data/pages.json']) {
-      try {
-        basePageFiles = (JSON.parse(commitBase['data/pages.json']).pages || [])
-          .map(function (p) { return p.file; }).filter(Boolean);
-      } catch (e) {}
-    }
-
     var files = uploads.files.slice();
     files.push({ path: 'data/pages.json', content: JSON.stringify(clone, null, 2) + '\n' });
-    /* 基线里旧工作流生成的 page-*.html，新 data/pages.json 已不再引用 → 删除 */
-    var deletes = basePageFiles.filter(function (f) {
-      return /^page-.+\.html$/.test(f) &&
-        !(clone.pages || []).some(function (p) { return p.file === f; });
-    });
-    return { files: files, deletes: deletes };
+    return { files: files };
   }
 
   /* ---------- 提交 ---------- */

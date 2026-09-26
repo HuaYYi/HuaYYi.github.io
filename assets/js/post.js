@@ -108,6 +108,10 @@
 
       var container = document.querySelector('.post-container');
       if (container) container.appendChild(nav);
+    }).catch(function (err) {
+      /* 数据源失败必须显式暴露：getPosts reject 时若静默结束，pager 会
+         不渲染且页面无任何线索（本次回归即因此难以第一时间发现） */
+      console.error('文章列表加载失败，上一篇/下一篇无法渲染：', err);
     });
   }
 

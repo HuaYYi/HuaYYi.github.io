@@ -4,7 +4,6 @@
    ============================================================ */
 
 /* 后台是独立全屏布局，不需要前台的 body 顶部留白 */
-body.admin-page,
 body {
   padding-top: 0;
 }
@@ -442,8 +441,7 @@ body {
   z-index: 5;
 }
 
-.tb-btn,
-.tb-select {
+.tb-btn {
   min-width: 34px;
   height: 32px;
   padding: 0 8px;
@@ -633,9 +631,6 @@ body {
 
 .form-grid-3 {
   grid-template-columns: 1.2fr 1fr 1fr;
-}
-.form-grid-4 {
-  grid-template-columns: repeat(4, 1fr);
 }
 
 /* 复选框字段：横排，不沿用普通字段的纵向 gap */
@@ -1439,8 +1434,7 @@ body {
 
 /* ---------- 窄屏适配 ---------- */
 @media (max-width: 860px) {
-  .form-grid-3,
-  .form-grid-4 {
+  .form-grid-3 {
     grid-template-columns: 1fr 1fr;
   }
 

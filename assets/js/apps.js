@@ -162,20 +162,6 @@
     }
   }
 
-  /* 读取应用代码原文（不经过注册表）：
-     与 fetchAppCode 同路径，但不依赖 initPage 流程 */
-  function readAppCode(id) {
-    try {
-      var raw = localStorage.getItem(LS_APPCODE_PREFIX + id);
-      if (raw != null) return Promise.resolve(raw);
-    } catch (e) {}
-    return fetch(U.ROOT + APPS_DIR + encodeURIComponent(id) + '.js', { cache: 'no-cache' })
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.text();
-      });
-  }
-
   /* configSchema 点路径读写（key 支持 'panel.opacity' 两级嵌套） */
   function setPath(obj, path, val) {
     var ks = String(path).split('.');
@@ -230,15 +216,16 @@
     pages: [
       {
         id: 'home', title: '首页', template: 'landing', file: 'index.html',
+        showTitle: false,
         screens: [
-          { bg: { type: 'particles' }, vAlign: 'center', boxes: [
+          { bg: { app: 'particles' }, vAlign: 'center', boxes: [
             { width: '1000px', hAlign: 'center', apps: [
               { uid: 'd2', id: 'quote', enable: true, align: 'center' },
               { uid: 'd3', id: 'search', enable: true, align: 'center' },
               { uid: 'd4', id: 'nav', enable: true, align: 'center' }
             ] }
           ] },
-          { bg: { type: 'none' }, vAlign: 'start', boxes: [
+          { vAlign: 'start', boxes: [
             { width: '760px', hAlign: 'center', apps: [
               { uid: 'd5', id: 'posts', enable: true, align: 'left', cfg: { title: '最新文章' } }
             ] }
@@ -247,8 +234,9 @@
       },
       {
         id: 'archives', title: '归档', template: 'list', file: '',
+        showTitle: true,
         screens: [
-          { bg: { type: 'none' }, vAlign: 'start', boxes: [
+          { vAlign: 'start', boxes: [
             { width: '760px', hAlign: 'center', apps: [
               { uid: 'e1', id: 'archive-list', enable: true, align: 'left' }
             ] }
@@ -257,8 +245,9 @@
       },
       {
         id: 'about', title: '关于', template: 'content', file: '',
+        showTitle: true,
         screens: [
-          { bg: { type: 'none' }, vAlign: 'start', boxes: [
+          { vAlign: 'start', boxes: [
             { width: '740px', hAlign: 'center', apps: [
               { uid: 'f1', id: 'rich-content', enable: true, align: 'left',
                 cfg: { html: '<p>关于页暂无内容。</p>' } }
@@ -336,8 +325,10 @@
     if (typeof ref === 'object' && Array.isArray(ref.rules)) {
       var rules = [];
       ref.rules.forEach(function (r) {
+        /* 推清洗结果而非原对象：sanitizeRule 的白名单过滤/夹取才生效，
+           与 normalizeResponsive 同一写法（曾误写成 push(r) 绕过清洗） */
         var c = sanitizeRule(level, r);
-        if (c) rules.push(r);
+        if (c) rules.push(c);
       });
       return rules.length ? { rules: rules } : undefined;
     }
@@ -374,7 +365,7 @@
 
     data.pages.forEach(function (page) {
       if (Array.isArray(page.screens) && page.screens.length) {
-        /* 需要背景的屏由 pages.json 显式写 particles/wallpaper；
+        /* 需要背景的屏显式写 bg={app, variant?}；无背景的屏不带 bg 字段。
            响应式挂载与基础布局数值就地清洗 */
         page.screens.forEach(function (sc) {
           normalizeScreenBg(sc);
@@ -392,22 +383,19 @@
             });
           });
         });
-        return;
       }
-
-      /* 无 screens 的异常/陈旧数据：给一空屏，渲染端与后台表现一致 */
-      var tpl = page.template === 'list' || page.template === 'content' ? page.template : 'landing';
-      page.screens = [makeEmptyScreen(tpl)];
-      delete page.apps;
+      /* 无 screens 的页面不在这里「补」空屏：渲染端与后台编辑器各自就地兜底，
+         数据层不替异常数据做结构假设（旧实现还会 delete page.apps——
+         页级 apps 字段早已不存在） */
     });
 
     return data;
   }
 
-  /* 屏背景：app=背景应用 id（开启背景层），variant=该应用内具体选项
-     （壁纸/视频文件，粒子无变体）；旧版 particles/wallpaper 自动迁移，
-     缺失/非法归一为 none。
-     不在此校验 app 是否注册——数据可能引用了已删除的应用：渲染时留空层、
+  /* 屏背景只有 {app, variant?} 一种形态：app=背景应用 id，variant=该应用内
+     具体选项（壁纸/视频文件，粒子无变体）；无背景的屏不带 bg 字段，
+     非法/空值就地删除而不是另造「none 标记」。
+     不校验 app 是否注册——数据可能引用了已删除的应用：渲染时留空层、
      后台仍显示原值，避免静默丢失配置 */
   function normalizeScreenBg(sc) {
     var b = sc && sc.bg;
@@ -415,18 +403,11 @@
       sc.bg = b.variant ? { app: b.app, variant: String(b.variant) } : { app: b.app };
       return;
     }
-    var t = b && b.type;
-    if (t === 'particles') { sc.bg = { app: 'particles' }; return; }
-    if (t === 'wallpaper') {
-      sc.bg = b.file ? { app: 'wallpapers', variant: String(b.file) } : { app: 'wallpapers' };
-      return;
-    }
-    sc.bg = { type: 'none' };
+    delete sc.bg;
   }
 
   function makeEmptyScreen(tpl) {
     return {
-      bg: { type: 'none' },
       vAlign: tpl === 'landing' ? 'center' : 'start',
       boxes: [ { width: DEFAULT_BOX_WIDTH[tpl] || '760px', hAlign: 'center', apps: [] } ]
     };
@@ -459,6 +440,9 @@
     var tpl = page.template === 'list' || page.template === 'content' ? page.template : 'landing';
     var screens = (page.screens && page.screens.length ? page.screens : [makeEmptyScreen(tpl)]);
     var multi = screens.length > 1;
+
+    /* 页面大标题显隐（后台「页面管理」逐页可配） */
+    var showTitle = page.showTitle === true;
 
     /* landing 始终整屏；list/content 只有一屏时保持普通文档流，
        加了多屏之后同样进入整屏 + 吸附模式 */
@@ -503,11 +487,11 @@
       sec.dataset.screen = String(si);
       sec.dataset.si = String(si);
 
-      /* 背景层：配置了背景应用（bg.app）才渲染。none（背景开关关闭）
-         不出层——零渲染开销，访客右键菜单也据此隐藏背景组。
+      /* 背景层：配置了背景应用（bg.app）才渲染；无 bg 的屏不出层——
+         零渲染开销，访客右键菜单也据此判断作者背景。
          层内容由 common.js 的 SSBScreenBG 在本页渲染后填充 */
-      var bgConf = screen.bg || { type: 'none' };
-      if (bgConf.app) {
+      var bgConf = screen.bg;
+      if (bgConf && bgConf.app) {
         var bgEl = document.createElement('div');
         bgEl.className = 'screen-bg';
         bgEl.dataset.bgApp = bgConf.app;
@@ -531,12 +515,14 @@
           '.page-screen[data-si="' + si + '"] .screen-inner', d);
       });
 
-      /* 非 landing 的页面标题放在盒组上方（全宽，独立于盒子对齐） */
-      if (tpl !== 'landing' && si === 0) {
-        var h1 = document.createElement('h1');
-        h1.className = 'page-heading ' + (tpl === 'content' ? 'post-title' : 'archive-page-title');
-        h1.textContent = page.title || '';
-        inner.appendChild(h1);
+      /* 标题的无盒兜底：标题通常放进第一个盒子（见下方盒循环），
+         与正文同宽同左缘；只有该屏连一个盒子都没有时，才退回屏级全宽标题 */
+      if (showTitle && si === 0 &&
+          !(screen.boxes && screen.boxes.length)) {
+        var h1Flat = document.createElement('h1');
+        h1Flat.className = 'page-heading ' + (tpl === 'content' ? 'post-title' : 'archive-page-title');
+        h1Flat.textContent = page.title || '';
+        inner.appendChild(h1Flat);
       }
 
       (screen.boxes || []).forEach(function (box, bi) {
@@ -555,6 +541,17 @@
         if (box.padH != null) bDecl.push('--box-padh:' + pxs(box.padH));
         if (box.gap != null) bDecl.push('--box-gap:' + pxs(box.gap));
         pushDecl(styleBase, bSel, bDecl);
+
+        /* 页面标题放首屏第一个盒子的顶部（每页面仅一次）：h1 与盒内
+           应用同在一个盒内，自动同宽、同左缘——结构对齐真实文章页
+           （post-container > h1 + 正文），宽屏下标题不再被甩到屏幕边。
+           显隐由页面 showTitle 控制（含落地页，站长可自行打开） */
+        if (showTitle && si === 0 && bi === 0) {
+          var h1 = document.createElement('h1');
+          h1.className = 'page-heading ' + (tpl === 'content' ? 'post-title' : 'archive-page-title');
+          h1.textContent = page.title || '';
+          boxEl.appendChild(h1);
+        }
 
         (box.apps || []).forEach(function (inst) {
           if (inst.enable === false) return;
@@ -720,12 +717,8 @@
   /* 对外工具接口（其他脚本复用） */
   window.SSBApps = {
     define: define,
-    register: define,           /* 别名，语义等价 */
     registry: registry,
-    manifest: function () { return manifest; },
-    loadErrors: function () { return loadErrors; },
     loadApplications: loadApplications,
-    readAppCode: readAppCode,
     appCodeKey: LS_APPCODE_PREFIX,
     appsDir: APPS_DIR,
     appDefaults: appDefaults,

@@ -49,11 +49,40 @@
   };
 
   /* ============================================================
+     复制文本 —— 全项目唯一复制入口（邮件弹窗 / 右键菜单 / 任何复制按钮）
+     优先 Clipboard API；非安全环境（http / file）或被拒绝时降级
+     execCommand('copy')。返回 Promise<boolean>，由调用方决定提示文案，
+     工具本身不弹 toast。
+     ============================================================ */
+  function copyPlainText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(
+        function () { return true; },
+        function () { return execCopyFallback(text); }
+      );
+    }
+    return Promise.resolve(execCopyFallback(text));
+  }
+
+  function execCopyFallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+
+  /* ============================================================
      BlogUtils —— 全局工具对象
      apps.js / post.js / screen-scroll.js 等脚本都通过 window.BlogUtils 使用
      ============================================================ */
   window.BlogUtils = {
     ROOT: ROOT,
+    copyText: copyPlainText,
     config: null,              /* 站点配置（site-config.json 解析结果），启动时注入 */
     _postsPromise: null,       /* getPosts() 的单次 Promise 缓存，避免重复 fetch */
 
@@ -144,7 +173,9 @@
 
     /* 读取并缓存文章列表，按日期倒序；本地保存的文章会并入列表。
        合并按 file 去重：同一篇文章正在本地编辑时，本地条目覆盖仓库条目，
-       避免列表出现重复行（提交后本地条目清除，自然回落到仓库版本） */
+       避免列表出现重复行（提交后本地条目清除，自然回落到仓库版本）。
+       不抽公共 helper——文章页只加载 common.js、后台只加载 apps.js，
+       两边脚本集合不相交，这 ~8 行重复是加载结构决定的天然边界 */
     getPosts: function () {
       if (!this._postsPromise) {
         var self = this;
@@ -583,28 +614,11 @@
         copyBtn.textContent = '已复制 ✓';
         copyBtn.disabled = true;
       }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(address).then(done).catch(function () {
-          legacyCopy(address);
-          done();
-        });
-      } else {
-        legacyCopy(address);
-        done();
-      }
+      /* 复制走全站唯一入口（内部已含降级），这里只管按钮态 */
+      copyPlainText(address).then(function (ok) {
+        if (ok) done();
+      });
     });
-
-    /* 剪贴板兜底：非安全环境（http / file）下 clipboard API 可能缺失 */
-    function legacyCopy(text) {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
-      ta.remove();
-    }
   }
 
   /* ============================================================
@@ -694,28 +708,33 @@
     toneLock: ''       /* 当前基调锁：''=未锁定；light/dark=被壁纸基调锁定 */
   };
 
-  /* 旧版偏好（mode=particles|wallpaper）一次性迁移到 v4 结构，
-     老访客升级后选择不丢；迁移结果写回，下次直接读新格式 */
-  function migratePref(p) {
-    if (!p || p.mode === 'none' || p.mode === 'app') return p;
-    if (p.mode === 'particles') return { mode: 'app', app: 'particles' };
-    if (p.mode === 'wallpaper') {
-      return {
-        mode: 'app', app: 'wallpapers',
-        variant: p.file || '', tone: p.tone
-      };
+  /* 访客偏好只做合法性校验、不做版本迁移：只接受
+     {mode:'none'} 与 {mode:'app', app, variant?, tone?} 两种形态；
+     识别不了的结构（含老访客浏览器里的旧版本地缓存）一律判非法，
+     由调用方清掉并回落跟随作者。不写迁移映射——老形态不是「要修的数据」，
+     只是「要丢弃的输入」，避免每加一种结构就多一条永久迁移分支 */
+  function validPref(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (p.mode === 'none') return { mode: 'none' };
+    if (p.mode === 'app' && typeof p.app === 'string' && p.app) {
+      var out = { mode: 'app', app: p.app };
+      if (p.variant) out.variant = String(p.variant);
+      if (p.tone === 'light' || p.tone === 'dark') out.tone = p.tone;
+      return out;
     }
-    return null;   /* 陈旧/非法值：回落跟随作者 */
+    return null;
   }
 
   function readBgPref() {
+    var p = null;
     try {
       var raw = localStorage.getItem(BG_PREF_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
-      var p = migratePref(parsed);
-      if (JSON.stringify(p) !== JSON.stringify(parsed)) writeBgPref(p);
-      screenBG.pref = p;
-    } catch (e) { screenBG.pref = null; }
+      p = validPref(parsed);
+      /* 形态被清洗/丢弃时写回，保证下次读到的就是合法结构 */
+      if (parsed && JSON.stringify(p) !== JSON.stringify(parsed)) writeBgPref(p);
+    } catch (e) { p = null; }
+    screenBG.pref = p;
     return screenBG.pref;
   }
 
@@ -970,8 +989,12 @@
            背景改由屏级背景系统在 apps.js 渲染完 ssb-page-rendered 后初始化 */
         applyResolvedTheme(resolveTheme(config));
 
-        document.title = document.title.replace(/\s*-\s*My Blog\s*$/, '') +
-          (document.title.indexOf(config.siteName) > -1 ? '' : ' - ' + config.siteName);
+        /* 标签页标题统一带站名：静态页面/动态渲染页在各自文件里写全；
+           仅动态外壳（本地文章查看页 view.html、404）初始只有页面名，
+           由这里补后缀。旧站名一律在源文件改正，运行时不做字符串替换 */
+        if (document.title.indexOf(config.siteName) === -1) {
+          document.title = document.title + ' - ' + config.siteName;
+        }
 
         renderHeader(config);
         renderFooter(config);
