@@ -1503,17 +1503,25 @@
     } else if (level === 'box') {
       f += '<label class="pe-rr"><span>宽度改为</span>' +
         '<input type="text" class="pe-r-width" data-k="width" value="' + v(r.width) + '" placeholder="100% / 92%" maxlength="12"></label>' +
-        '<label class="pe-rr"><span>上下边距</span>' +
-        '<input type="number" class="pe-r-num" data-k="padV" min="0" step="1" value="' + v(r.padV) + '"></label>' +
-        '<label class="pe-rr"><span>左右边距</span>' +
-        '<input type="number" class="pe-r-num" data-k="padH" min="0" step="1" value="' + v(r.padH) + '"></label>' +
+        '<label class="pe-rr"><span>内边距↑</span>' +
+        '<input type="number" class="pe-r-num" data-k="padT" min="0" step="1" value="' + v(r.padT) + '"></label>' +
+        '<label class="pe-rr"><span>内边距↓</span>' +
+        '<input type="number" class="pe-r-num" data-k="padB" min="0" step="1" value="' + v(r.padB) + '"></label>' +
+        '<label class="pe-rr"><span>内边距←</span>' +
+        '<input type="number" class="pe-r-num" data-k="padL" min="0" step="1" value="' + v(r.padL) + '"></label>' +
+        '<label class="pe-rr"><span>内边距→</span>' +
+        '<input type="number" class="pe-r-num" data-k="padR" min="0" step="1" value="' + v(r.padR) + '"></label>' +
         '<label class="pe-rr"><span>垂直间距</span>' +
         '<input type="number" class="pe-r-num" data-k="gap" min="0" step="1" value="' + v(r.gap) + '"></label>';
     } else {
-      f += '<label class="pe-rr"><span>上下外边距</span>' +
-        '<input type="number" class="pe-r-num" data-k="marginV" min="0" step="1" value="' + v(r.marginV) + '"></label>' +
-        '<label class="pe-rr"><span>左右外边距</span>' +
-        '<input type="number" class="pe-r-num" data-k="marginH" min="0" step="1" value="' + v(r.marginH) + '"></label>' +
+      f += '<label class="pe-rr"><span>外边距↑</span>' +
+        '<input type="number" class="pe-r-num" data-k="marginT" min="0" step="1" value="' + v(r.marginT) + '"></label>' +
+        '<label class="pe-rr"><span>外边距↓</span>' +
+        '<input type="number" class="pe-r-num" data-k="marginB" min="0" step="1" value="' + v(r.marginB) + '"></label>' +
+        '<label class="pe-rr"><span>外边距←</span>' +
+        '<input type="number" class="pe-r-num" data-k="marginL" min="0" step="1" value="' + v(r.marginL) + '"></label>' +
+        '<label class="pe-rr"><span>外边距→</span>' +
+        '<input type="number" class="pe-r-num" data-k="marginR" min="0" step="1" value="' + v(r.marginR) + '"></label>' +
         '<label class="pe-rr pe-rr-check"><input type="checkbox" class="pe-r-hidden" data-k="hidden"' +
         (r.hidden ? ' checked' : '') + '><span>此档宽度下隐藏</span></label>';
     }
@@ -1710,55 +1718,17 @@
   var ALIGN_PAIRS = [['left', '左对齐'], ['center', '居中'], ['right', '右对齐']];
   var VALIGN_PAIRS = [['start', '靠上'], ['center', '上下居中'], ['end', '靠下']];
   /* v4：屏背景类型改为后台背景应用清单动态生成，不再有写死的类型对 */
-  var ORDER_PAIRS = [['newest', '最新在前'], ['oldest', '最早在前']];
-  var GROUP_PAIRS = [['year', '按年 → 月'], ['month', '按年-月'], ['flat', '平铺不分组']];
 
-  /* 板块的实例级配置区：posts / archive-list 有表单，rich-content 是富文本编辑器，
-     其余板块（notice/quote/search/nav）的数据在「应用管理」中维护，这里无实例配置 */
+  /* 板块的实例级配置区：页面管理只管布局，应用功能参数统一在「应用管理」
+     维护，这里不再重复。仅保留两类实例自有内容：posts 的区块标题（每个
+     列表块可各自命名）、rich-content 的正文 */
   function instCfgHTML(inst) {
-    var g = (pagesData.apps || {})[inst.id] || {};
     var c = inst.cfg || {};
 
     if (inst.id === 'posts') {
-      var count = c.count != null ? c.count : (g.count != null ? g.count : 6);
-      var cover = c.cover != null ? c.cover : (g.cover !== false);
-      var summary = c.summary != null ? c.summary : (g.summary !== false);
-      var order = c.order || g.order || 'newest';
-      var cat = c.category != null ? c.category : (g.category || '');
       return '<div class="pe-cfg">' +
         '<label class="pe-cf pe-cf-title"><span>区块标题（留空=默认“最新文章”）</span>' +
           '<input type="text" class="pe-cfg-title" value="' + escapeHTML(c.title || '') + '" maxlength="30"></label>' +
-        '<label class="pe-cf"><span>显示篇数（0=全部）</span>' +
-          '<input type="number" class="pe-cfg-count" min="0" max="100" step="1" value="' + count + '"></label>' +
-        '<label class="pe-cf"><span>排序</span>' +
-          '<select class="pe-cfg-order">' + selOptions(ORDER_PAIRS, order) + '</select></label>' +
-        '<label class="pe-cf"><span>限定分类（留空=全部）</span>' +
-          '<input type="text" class="pe-cfg-category" value="' + escapeHTML(cat) + '" maxlength="20"></label>' +
-        '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-cover"' +
-          (cover ? ' checked' : '') + '><span>封面图</span></label>' +
-        '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-summary"' +
-          (summary ? ' checked' : '') + '><span>摘要</span></label>' +
-      '</div>';
-    }
-
-    if (inst.id === 'archive-list') {
-      var groupBy = ['year', 'month', 'flat'].indexOf(c.groupBy) > -1
-        ? c.groupBy : (g.groupBy || 'year');
-      var aOrder = c.order || g.order || 'newest';
-      var filters = c.filters != null ? c.filters : (g.filters !== false);
-      var pageSize = c.pageSize != null ? c.pageSize : (g.pageSize != null ? g.pageSize : 10);
-      var showTotal = c.showTotal != null ? c.showTotal : (g.showTotal !== false);
-      return '<div class="pe-cfg">' +
-        '<label class="pe-cf"><span>分组方式</span>' +
-          '<select class="pe-cfg-groupby">' + selOptions(GROUP_PAIRS, groupBy) + '</select></label>' +
-        '<label class="pe-cf"><span>排序</span>' +
-          '<select class="pe-cfg-order">' + selOptions(ORDER_PAIRS, aOrder) + '</select></label>' +
-        '<label class="pe-cf"><span>每页篇数（0=不分页）</span>' +
-          '<input type="number" class="pe-cfg-pagesize" min="0" max="999" step="1" value="' + pageSize + '"></label>' +
-        '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-filters"' +
-          (filters ? ' checked' : '') + '><span>分类筛选条</span></label>' +
-        '<label class="pe-cf pe-cf-check"><input type="checkbox" class="pe-cfg-total"' +
-          (showTotal ? ' checked' : '') + '><span>显示文章总数</span></label>' +
       '</div>';
     }
 
@@ -1797,10 +1767,14 @@
       instCfgHTML(inst) +
       '<label class="pe-a-align"><span>对齐</span>' +
         '<select class="pe-aalign">' + selOptions(ALIGN_PAIRS, inst.align || 'left') + '</select></label>' +
-      '<label class="pe-a-mg"><span>边距↕</span>' +
-        '<input type="number" class="pe-amgv" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginV) + '"></label>' +
-      '<label class="pe-a-mg"><span>边距↔</span>' +
-        '<input type="number" class="pe-amgh" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginH) + '"></label>' +
+      '<label class="pe-a-mg"><span>边距↑</span>' +
+        '<input type="number" class="pe-amgt" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginT) + '"></label>' +
+      '<label class="pe-a-mg"><span>边距↓</span>' +
+        '<input type="number" class="pe-amgb" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginB) + '"></label>' +
+      '<label class="pe-a-mg"><span>边距←</span>' +
+        '<input type="number" class="pe-amgl" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginL) + '"></label>' +
+      '<label class="pe-a-mg"><span>边距→</span>' +
+        '<input type="number" class="pe-amgr" min="0" max="9999" step="1" placeholder="0" value="' + num(inst.marginR) + '"></label>' +
       '<span class="pe-a-resp">' + respAttachHTML('app', inst.responsive) + '</span>' +
       moveHTML +
       '<span class="pe-app-acts">' +
@@ -1844,10 +1818,14 @@
         '</span>' +
       '</div>' +
       '<div class="pe-box-props">' +
-        '<label class="pe-bp"><span>内边距 上下</span>' +
-          '<input type="number" class="pe-bpadv" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padV) + '"></label>' +
-        '<label class="pe-bp"><span>内边距 左右</span>' +
-          '<input type="number" class="pe-bpadh" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padH) + '"></label>' +
+        '<label class="pe-bp"><span>内边距 ↑</span>' +
+          '<input type="number" class="pe-bpadt" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padT) + '"></label>' +
+        '<label class="pe-bp"><span>内边距 ↓</span>' +
+          '<input type="number" class="pe-bpadb" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padB) + '"></label>' +
+        '<label class="pe-bp"><span>内边距 ←</span>' +
+          '<input type="number" class="pe-bpadl" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padL) + '"></label>' +
+        '<label class="pe-bp"><span>内边距 →</span>' +
+          '<input type="number" class="pe-bpadr" min="0" max="9999" step="1" placeholder="默认 0" value="' + num(box.padR) + '"></label>' +
         '<label class="pe-bp"><span>垂直间距（盒内板块间隔）</span>' +
           '<input type="number" class="pe-bgap" min="0" max="9999" step="1" placeholder="默认 16" value="' + num(box.gap) + '"></label>' +
         '<div class="pe-bp pe-bp-resp"><span>响应式</span>' + respAttachHTML('box', box.responsive) + '</div>' +
@@ -2033,11 +2011,15 @@
           var where = '第 ' + (s + 1) + ' 屏盒子 ' + (b + 1);
           var box = { width: boxEl.querySelector('.pe-bw-input').value.trim(),
                       hAlign: boxEl.querySelector('.pe-bh-select').value, apps: [] };
-          var padV = boxEl.querySelector('.pe-bpadv').value.trim();
-          var padH = boxEl.querySelector('.pe-bpadh').value.trim();
+          var padT = boxEl.querySelector('.pe-bpadt').value.trim();
+          var padB = boxEl.querySelector('.pe-bpadb').value.trim();
+          var padL = boxEl.querySelector('.pe-bpadl').value.trim();
+          var padR = boxEl.querySelector('.pe-bpadr').value.trim();
           var bgap = boxEl.querySelector('.pe-bgap').value.trim();
-          if (padV !== '') box.padV = readNum(padV, where + '的「内边距 上下」');
-          if (padH !== '') box.padH = readNum(padH, where + '的「内边距 左右」');
+          if (padT !== '') box.padT = readNum(padT, where + '的「内边距 ↑」');
+          if (padB !== '') box.padB = readNum(padB, where + '的「内边距 ↓」');
+          if (padL !== '') box.padL = readNum(padL, where + '的「内边距 ←」');
+          if (padR !== '') box.padR = readNum(padR, where + '的「内边距 →」');
           if (bgap !== '') box.gap = readNum(bgap, where + '的「垂直间距」');
           box.responsive = readRespAttach(boxEl.querySelector('.pe-resp[data-level="box"]'), where);
 
@@ -2047,39 +2029,21 @@
             var inst = { uid: row.dataset.ui, id: row.dataset.aid,
                          enable: row.querySelector('.pe-aon').checked,
                          align: row.querySelector('.pe-aalign').value };
-            var mgv = row.querySelector('.pe-amgv').value.trim();
-            var mgh = row.querySelector('.pe-amgh').value.trim();
-            if (mgv !== '') inst.marginV = readNum(mgv, where + '板块的外边距↕');
-            if (mgh !== '') inst.marginH = readNum(mgh, where + '板块的外边距↔');
+            var mgT = row.querySelector('.pe-amgt').value.trim();
+            var mgB = row.querySelector('.pe-amgb').value.trim();
+            var mgL = row.querySelector('.pe-amgl').value.trim();
+            var mgR = row.querySelector('.pe-amgr').value.trim();
+            if (mgT !== '') inst.marginT = readNum(mgT, where + '板块的「边距↑」');
+            if (mgB !== '') inst.marginB = readNum(mgB, where + '板块的「边距↓」');
+            if (mgL !== '') inst.marginL = readNum(mgL, where + '板块的「边距←」');
+            if (mgR !== '') inst.marginR = readNum(mgR, where + '板块的「边距→」');
             inst.responsive = readRespAttach(row.querySelector('.pe-resp[data-level="app"]'),
               where + '的「' + appLabel(inst.id) + '」');
             if (inst.id === 'posts') {
-              var n = parseInt(row.querySelector('.pe-cfg-count').value, 10);
-              if (isNaN(n) || n < 0 || n > 100) {
-                throw new Error(where + '的文章列表「显示篇数」需为 0~100 的整数');
-              }
-              var cfg = {
-                count: n,
-                order: row.querySelector('.pe-cfg-order').value === 'oldest' ? 'oldest' : 'newest',
-                category: row.querySelector('.pe-cfg-category').value.trim(),
-                cover: row.querySelector('.pe-cfg-cover').checked,
-                summary: row.querySelector('.pe-cfg-summary').checked
-              };
+              /* 仅实例自有的区块标题；功能参数（篇数/排序/分类/封面/摘要）
+                 统一读「应用管理」的全局配置 */
               var title = row.querySelector('.pe-cfg-title').value.trim();
-              if (title) cfg.title = title;   /* 留空时前台回落到默认「最新文章」 */
-              inst.cfg = cfg;
-            } else if (inst.id === 'archive-list') {
-              var ps = parseInt(row.querySelector('.pe-cfg-pagesize').value, 10);
-              if (isNaN(ps) || ps < 0 || ps > 999) {
-                throw new Error(where + '的归档列表「每页篇数」需为 0~999 的整数');
-              }
-              inst.cfg = {
-                groupBy: row.querySelector('.pe-cfg-groupby').value,
-                order: row.querySelector('.pe-cfg-order').value === 'oldest' ? 'oldest' : 'newest',
-                pageSize: ps,
-                filters: row.querySelector('.pe-cfg-filters').checked,
-                showTotal: row.querySelector('.pe-cfg-total').checked
-              };
+              if (title) inst.cfg = { title: title };
             } else if (inst.id === 'rich-content') {
               inst.cfg = { html: row.querySelector('.pe-rich-body').innerHTML };
             }

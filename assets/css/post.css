@@ -7,7 +7,7 @@
 /* ---------- 整体两栏布局：正文 + 右侧目录 ---------- */
 .post-layout {
   max-width: 1080px;
-  margin: 30px auto 0;
+  margin: calc(var(--header-h) + 30px) auto 0;
   padding: 0 24px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 230px;

@@ -58,8 +58,11 @@
     return Array.prototype.slice.call(document.querySelectorAll('#app-screens .page-screen.is-full'));
   }
 
-  /* 某屏对齐头部下沿时的滚动位置（第一屏 = 0） */
-  function dockY(screen) { return screen.offsetTop - headerH(); }
+  /* 某屏对齐头部下沿时的滚动位置（第一屏 offsetTop=0 → dock=0，
+     内容自身 padding-top 已让开 header） */
+  function dockY(screen) {
+    return Math.max(0, screen.offsetTop - headerH());
+  }
 
   /* 长屏内容滚到底时的滚动位置（屏底贴视口底） */
   function bottomY(screen) {

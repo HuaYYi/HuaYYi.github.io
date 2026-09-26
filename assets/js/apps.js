@@ -274,8 +274,8 @@
   var ALIGN_KEYS = { vAlign: 1, hAlign: 1 };
   var RESP_PROPS = {
     screen: { padV: 1, padH: 1, gap: 1, vAlign: 1, hAlign: 1 },
-    box: { width: 1, padV: 1, padH: 1, gap: 1 },
-    app: { marginV: 1, marginH: 1, hidden: 1 }
+    box: { width: 1, padT: 1, padR: 1, padB: 1, padL: 1, gap: 1 },
+    app: { marginT: 1, marginR: 1, marginB: 1, marginL: 1, hidden: 1 }
   };
 
   /* 单档规则清洗：返回 null = max 非法或一个有效属性都没有 */
@@ -306,7 +306,7 @@
     return Object.keys(out).length > 1 ? out : null;
   }
 
-  /* 可选数值字段（盒 padV/padH/gap、应用 marginV/marginH 的基础值） */
+  /* 可选数值字段（盒 padT/R/B/L/gap、应用 marginT/R/B/L 的基础值） */
   function optNum(v) {
     if (v == null || v === '') return undefined;
     var n = Number(v);
@@ -372,14 +372,18 @@
           sc.responsive = normalizeAttach('screen', sc.responsive, tplLib);
           (sc.boxes || []).forEach(function (box) {
             box.responsive = normalizeAttach('box', box.responsive, tplLib);
-            box.padV = optNum(box.padV);
-            box.padH = optNum(box.padH);
+            box.padT = optNum(box.padT);
+            box.padR = optNum(box.padR);
+            box.padB = optNum(box.padB);
+            box.padL = optNum(box.padL);
             box.gap = optNum(box.gap);
             (box.apps || []).forEach(function (inst) {
               if (!inst.uid) inst.uid = genUID();
               inst.responsive = normalizeAttach('app', inst.responsive, tplLib);
-              inst.marginV = optNum(inst.marginV);
-              inst.marginH = optNum(inst.marginH);
+              inst.marginT = optNum(inst.marginT);
+              inst.marginR = optNum(inst.marginR);
+              inst.marginB = optNum(inst.marginB);
+              inst.marginL = optNum(inst.marginL);
             });
           });
         });
@@ -537,8 +541,10 @@
         var bSel = '.page-box[data-si="' + si + '"][data-bi="' + bi + '"]';
         var bDecl = [];
         if (box.width) bDecl.push('--box-w:' + box.width);
-        if (box.padV != null) bDecl.push('--box-padv:' + pxs(box.padV));
-        if (box.padH != null) bDecl.push('--box-padh:' + pxs(box.padH));
+        if (box.padT != null) bDecl.push('--box-pt:' + pxs(box.padT));
+        if (box.padR != null) bDecl.push('--box-pr:' + pxs(box.padR));
+        if (box.padB != null) bDecl.push('--box-pb:' + pxs(box.padB));
+        if (box.padL != null) bDecl.push('--box-pl:' + pxs(box.padL));
         if (box.gap != null) bDecl.push('--box-gap:' + pxs(box.gap));
         pushDecl(styleBase, bSel, bDecl);
 
@@ -577,13 +583,17 @@
           /* 应用基础外边距 + 应用级响应式（外边距 / 窄屏隐藏） */
           var aSel = '.app[data-uid="' + inst.uid + '"]';
           var aDecl = [];
-          if (inst.marginV != null) aDecl.push('--app-mv:' + pxs(inst.marginV));
-          if (inst.marginH != null) aDecl.push('--app-mh:' + pxs(inst.marginH));
+          if (inst.marginT != null) aDecl.push('--app-mt:' + pxs(inst.marginT));
+          if (inst.marginR != null) aDecl.push('--app-mr:' + pxs(inst.marginR));
+          if (inst.marginB != null) aDecl.push('--app-mb:' + pxs(inst.marginB));
+          if (inst.marginL != null) aDecl.push('--app-ml:' + pxs(inst.marginL));
           pushDecl(styleBase, aSel, aDecl);
           rulesOf(inst.responsive, 'app').forEach(function (r) {
             var d = [];
-            if (r.marginV != null) d.push('--app-mv:' + pxs(r.marginV));
-            if (r.marginH != null) d.push('--app-mh:' + pxs(r.marginH));
+            if (r.marginT != null) d.push('--app-mt:' + pxs(r.marginT));
+            if (r.marginR != null) d.push('--app-mr:' + pxs(r.marginR));
+            if (r.marginB != null) d.push('--app-mb:' + pxs(r.marginB));
+            if (r.marginL != null) d.push('--app-ml:' + pxs(r.marginL));
             if (r.hidden) d.push('display:none');
             pushDecl(styleMedia[r.max] = styleMedia[r.max] || [], aSel, d);
           });

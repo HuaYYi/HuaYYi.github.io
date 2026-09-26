@@ -93,7 +93,6 @@ body {
   color: var(--text);
   background: var(--bg);
   line-height: 1.6;
-  padding-top: var(--header-h);   /* 给固定头部让位 */
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;             /* 防止任何元素（下拉菜单/tab栏/粒子）溢出撑出水平滚动条 */
   /* sticky footer：body 为纵向 flex 列，内容区 flex:1 吃满剩余高度，
@@ -189,11 +188,6 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
   /* 不用 overflow:hidden：长内容屏要能自然撑高；
      背景层 .screen-bg 自带 overflow:hidden 负责裁剪粒子 */
 }
-/* 第一屏要让掉固定头部高度（body padding-top 之外，section 自身满高时） */
-.page-screen.is-full:first-child {
-  min-height: calc(100vh - var(--header-h));
-  min-height: calc(100dvh - var(--header-h));
-}
 
 /* 屏内盒组：相对背景层抬起，is-full 时吃满整屏高度以便垂直分布。
    内边距/间距全部变量化：--scr-padv/padh 为后台成对设置（上下/左右），
@@ -225,6 +219,11 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 .page-screen.is-full .screen-inner.screen-valign-center {
   --scr-padb: 40px;
 }
+/* 首屏从视口最顶部开始（fixed header 浮在最上层）：非居中布局内容顶部
+   让开一个 header 高度；居中内容块本在屏中部不会被压，保持 40px
+   以维持视觉中心 */
+.page-screen:first-child .screen-inner { --scr-padt: var(--header-h); }
+.page-screen:first-child .screen-inner.screen-valign-center { --scr-padt: 40px; }
 
 /* 盒组九宫格分布：垂直（justify）×水平（align-items） */
 .screen-valign-start { justify-content: flex-start; }
@@ -233,10 +232,6 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 .screen-halign-start { align-items: flex-start; }
 .screen-halign-center { align-items: center; }
 .screen-halign-end { align-items: flex-end; }
-
-/* 非整屏（list/content 单屏）的上下边距按模板微调 */
-.page-tpl-list .page-screen:not(.is-full) .screen-inner { --scr-padt: 44px; }
-.page-tpl-content .page-screen:not(.is-full) .screen-inner { --scr-padt: 24px; }
 
 /* 页面标题（非 landing）：默认由 apps.js 放进第一个盒子，与正文同宽同左缘；
    无盒兜底时挂屏级，stretch 保证占满屏内宽不被九宫格 align-items 收缩 */
@@ -258,10 +253,10 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding-top: var(--box-padv, 0px);
-  padding-bottom: var(--box-padv, 0px);
-  padding-left: var(--box-padh, 0px);
-  padding-right: var(--box-padh, 0px);
+  padding-top: var(--box-pt, 30px);
+  padding-bottom: var(--box-pb, 0px);
+  padding-left: var(--box-pl, 0px);
+  padding-right: var(--box-pr, 0px);
   gap: var(--box-gap, 16px);
 }
 .page-box[data-halign="left"] { align-self: flex-start; }
@@ -271,13 +266,13 @@ html[data-theme="dark"] .screen-bg-wallpaper .screen-bg-overlay {
 
 /* 板块实例在盒内的水平对齐：
    text-align 管住文字类板块，子块 margin auto 管住搜索框/导航等组件；
-   margin 变量供后台设置板块外边距（上下/左右成对） */
+   margin 变量供后台逐向设置板块外边距（上/下/左/右） */
 .app {
   min-width: 0;
-  margin-top: var(--app-mv, 0px);
-  margin-bottom: var(--app-mv, 0px);
-  margin-left: var(--app-mh, 0px);
-  margin-right: var(--app-mh, 0px);
+  margin-top: var(--app-mt, 0px);
+  margin-bottom: var(--app-mb, 0px);
+  margin-left: var(--app-ml, 0px);
+  margin-right: var(--app-mr, 0px);
 }
 .app[data-align="left"] { text-align: left; }
 .app[data-align="center"] { text-align: center; }
@@ -318,16 +313,7 @@ html.cur-bg-on .site-header {
 }
 html[data-theme="dark"].cur-bg-on .site-header {
   background: rgba(15, 20, 28, .5);
-  border-bottom-color: rgba(255, 255, 255, .08);
-}
-
-/* 第一屏背景铺满到头部后面：不动布局（负 margin 会改变 offsetTop，
-   破坏 screen-scroll.js 的 dock 几何），只让背景层向上延伸一个头部
-   高度；视频/图片 object-fit:cover，延伸区自然填满；层 z-index:0
-   低于 fixed 头部（z-index:100），头部半透明时即可透出 */
-.page-screen:first-child.bg-active > .screen-bg {
-  top: calc(-1 * var(--header-h));
-  height: calc(100% + var(--header-h));
+  border-bottom-color: rgba(255, 255, .08);
 }
 
 .header-inner {

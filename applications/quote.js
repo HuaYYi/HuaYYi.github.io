@@ -11,7 +11,7 @@ SSBApps.define({
   dataFile: 'data/quotes.json',
   configSchema: [
     { key: 'speed', label: '打字速度（每字间隔毫秒，越小越快）', type: 'number', min: 0, max: 1000, step: 10, def: 60 },
-    { key: 'lines', label: '预留行数（超出自动缩小字号，绝不截断）', type: 'number', min: 1, max: 6, step: 1, def: 3 },
+    { key: 'lines', label: '预留行数（超出自动缩小字号，绝不截断）', type: 'number', min: 1, max: 6, step: 1, def: 2 },
     { key: 'lineHeight', label: '行高（em，需与下方 CSS 的 line-height 保持一致）', type: 'number', min: 1, max: 3, step: 0.1, def: 1.7 },
     { key: 'fsMax', label: '起始字号 px', type: 'number', min: 14, max: 40, step: 1, def: 22 },
     { key: 'fsMin', label: '最小字号 px', type: 'number', min: 10, max: 30, step: 1, def: 13 }
@@ -33,7 +33,7 @@ html[data-theme="dark"] {
 .hero-quote {
   width: 100%;
   max-width: 680px;
-  min-height: calc(1.7em * 3);
+  min-height: calc(1.7em * 2);
   margin: 0;
   display: flex;
   align-items: flex-end;
