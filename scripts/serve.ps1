@@ -64,6 +64,10 @@ try {
 
             if (Test-Path $filePath -PathType Container) {
                 $filePath = Join-Path $filePath 'index.html'
+            } elseif (-not (Test-Path $filePath -PathType Leaf) -and
+                      [string]::IsNullOrEmpty([IO.Path]::GetExtension($filePath))) {
+                # Clean URL: /posts/welcome -> posts/welcome.html (matches GitHub Pages)
+                if (Test-Path "$filePath.html" -PathType Leaf) { $filePath = "$filePath.html" }
             }
 
             if (Test-Path $filePath -PathType Leaf) {

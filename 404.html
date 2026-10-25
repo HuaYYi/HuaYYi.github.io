@@ -47,16 +47,16 @@
     <div class="nf-code">404</div>
     <h1>页面走丢了</h1>
     <p>你访问的页面不存在，或已被移动。</p>
-    <a class="nf-home" id="nf-home" href="index.html">← 返回首页</a>
+    <a class="nf-home" id="nf-home" href="./">← 返回首页</a>
   </div>
   <script>
     /* 404 可能在任意深度路径被提供：
-       单级错误路径（如 /repo/typo）相对 index.html 已能回到首页；
+       单级错误路径（如 /repo/typo）相对 ./ 已能回到首页；
        多级路径（如 /repo/typo/bar）退回到第一路径段（项目站点根）兜底 */
     (function () {
       var segs = location.pathname.split('/');
       if (segs.length > 3) {
-        document.getElementById('nf-home').href = '/' + segs[1] + '/index.html';
+        document.getElementById('nf-home').href = '/' + segs[1] + '/';
       }
     })();
   </script>

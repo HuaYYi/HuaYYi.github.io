@@ -1909,8 +1909,8 @@
 
   function pageFileHint(p) {
     if (isBuiltinPage(p)) return '落地页固定入口：index.html（全站唯一，不可删除）';
-    /* 自建页统一走动态页 page.html?slug=，无需在仓库生成静态外壳 */
-    return '动态页：page.html?slug=' + escapeHTML(p.id);
+    /* 自建页统一走动态页 page?slug=，无需在仓库生成静态外壳 */
+    return '动态页：page?slug=' + escapeHTML(p.id);
   }
 
   function renderPageEditor() {

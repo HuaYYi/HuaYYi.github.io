@@ -82,7 +82,7 @@
   function renderPager() {
     /* 当前文章文件名：本地动态页取 ?file=，静态页取路径末段 */
     var params = new URLSearchParams(location.search);
-    var current = params.get('file') || (location.pathname.split('/').pop() || 'index.html');
+    var current = params.get('file') || U.currentFile();
 
     U.getPosts().then(function (posts) {
       var idx = -1;

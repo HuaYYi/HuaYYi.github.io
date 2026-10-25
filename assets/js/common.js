@@ -105,13 +105,28 @@
     },
 
     /* 文章详情链接：任何页面层级都能用。
-       本地有覆盖的文章跳 view.html 动态渲染（无真实 HTML 文件）；
-       其余情况直接跳 posts/*.html */
+       本地有覆盖的文章跳 posts/view 动态渲染（无真实 HTML 文件）；
+       其余情况直接跳 posts/*（clean URL，无 .html 后缀） */
     postHref: function (file) {
       if (this.isLocalFile(file)) {
-        return ROOT + 'posts/view.html?file=' + encodeURIComponent(file);
+        return ROOT + 'posts/view?file=' + encodeURIComponent(file);
       }
-      return ROOT + 'posts/' + file;
+      return ROOT + 'posts/' + String(file).replace(/\.html$/, '');
+    },
+
+    /* 页面文件名 → 站内 URL：index.html → 根路径；其余去 .html 后缀。
+       GitHub Pages 与本地服务器都会把无后缀请求回退到同名 .html 文件 */
+    pageHref: function (file) {
+      if (!file || file === 'index.html') return ROOT;
+      return ROOT + String(file).replace(/\.html$/, '');
+    },
+
+    /* 当前 URL 末段 → 文件名：'/'、'/index' 视为 index.html；
+       无后缀段（clean URL）补回 .html，以便与数据中的 file 字段比较 */
+    currentFile: function () {
+      var seg = location.pathname.split('/').pop();
+      if (!seg || seg === 'index') return 'index.html';
+      return seg.indexOf('.') > -1 ? seg : seg + '.html';
     },
 
     /* ============================================================
@@ -293,15 +308,15 @@
     header.innerHTML =
       '<div class="site-header">' +
         '<div class="header-inner">' +
-          '<a class="site-logo" href="' + ROOT + 'index.html">' +
+          '<a class="site-logo" href="' + ROOT + '">' +
             logoInner +
             '<span class="logo-text">' + BlogUtils.escapeHTML(config.siteName) + '</span>' +
           '</a>' +
           '<div class="header-right">' +
             '<nav class="site-nav" id="site-nav">' +
-              '<a href="' + ROOT + 'index.html">首页</a>' +
-              '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
-              '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
+              '<a href="' + ROOT + '">首页</a>' +
+              '<a href="' + ROOT + 'page?slug=archives" data-pid="archives">归档</a>' +
+              '<a href="' + ROOT + 'page?slug=about" data-pid="about">关于</a>' +
             '</nav>' +
             '<div class="site-search">' +
               '<input type="text" id="site-search-input" placeholder="搜索文章" autocomplete="off">' +
@@ -316,9 +331,9 @@
       '</div>' +
       '<div class="mobile-drawer" id="mobile-drawer">' +
         '<nav class="mobile-nav" id="mobile-nav">' +
-          '<a href="' + ROOT + 'index.html">首页</a>' +
-          '<a href="' + ROOT + 'page.html?slug=archives" data-pid="archives">归档</a>' +
-          '<a href="' + ROOT + 'page.html?slug=about" data-pid="about">关于</a>' +
+          '<a href="' + ROOT + '">首页</a>' +
+          '<a href="' + ROOT + 'page?slug=archives" data-pid="archives">归档</a>' +
+          '<a href="' + ROOT + 'page?slug=about" data-pid="about">关于</a>' +
         '</nav>' +
         '<div class="mobile-search">' +
           '<input type="text" id="mobile-search-input" placeholder="搜索文章">' +
@@ -338,14 +353,14 @@
 
   /* ---------- 导航项渲染：读 pages.json 的 pages 数组 ----------
      每个页面一个导航项，顺序即页面数组顺序（落地页锚定首位）。
-     落地页 file=index.html；其余页面 file 一律为空，跳
-     page.html?slug= 动态渲染。读取失败保持默认兜底链接 */
+     落地页 file=index.html → 根路径；其余页面 file 一律为空，跳
+     page?slug= 动态渲染。读取失败保持默认兜底链接 */
   function renderNavFromPages() {
     BlogUtils.loadDataFile('data/pages.json').then(function (data) {
       if (!data || !Array.isArray(data.pages) || !data.pages.length) return;
 
       var linksHTML = data.pages.map(function (p) {
-        var href = p.file ? ROOT + p.file : ROOT + 'page.html?slug=' + encodeURIComponent(p.id);
+        var href = p.file ? BlogUtils.pageHref(p.file) : ROOT + 'page?slug=' + encodeURIComponent(p.id);
         return '<a href="' + href + '" data-file="' + BlogUtils.escapeHTML(p.file || '') +
                '" data-pid="' + BlogUtils.escapeHTML(p.id) + '">' +
                BlogUtils.escapeHTML(p.title || p.id) + '</a>';
@@ -433,9 +448,9 @@
   }
 
   /* 根据当前页面高亮导航项：
-     普通页面按文件名匹配 data-file；page.html?slug=xxx 动态页按 slug 匹配 data-pid */
+     普通页面按文件名匹配 data-file；page?slug=xxx 动态页按 slug 匹配 data-pid */
   function highlightNav() {
-    var file = location.pathname.split('/').pop() || 'index.html';
+    var file = BlogUtils.currentFile();
     var slug = null;
     try { slug = new URLSearchParams(location.search).get('slug'); } catch (e) {}
     document.querySelectorAll('.site-nav a, .mobile-nav a').forEach(function (a) {

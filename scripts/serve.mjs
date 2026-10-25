@@ -42,6 +42,9 @@ const server = http.createServer((req, res) => {
     let target = filePath;
     if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
       target = path.join(target, 'index.html');
+    } else if (!fs.existsSync(target) && !path.extname(target)) {
+      /* clean URL：/posts/welcome → posts/welcome.html（与 GitHub Pages 行为一致） */
+      if (fs.existsSync(target + '.html')) target += '.html';
     }
 
     if (!fs.existsSync(target)) {

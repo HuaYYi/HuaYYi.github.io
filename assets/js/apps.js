@@ -429,7 +429,7 @@
     if (slug) {
       return data.pages.filter(function (p) { return p.id === slug; })[0] || null;
     }
-    var file = location.pathname.split('/').pop() || 'index.html';
+    var file = U.currentFile();
     return data.pages.filter(function (p) { return (p.file || '') === file; })[0] || null;
   }
 
