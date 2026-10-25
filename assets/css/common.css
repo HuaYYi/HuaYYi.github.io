@@ -313,7 +313,7 @@ html.cur-bg-on .site-header {
 }
 html[data-theme="dark"].cur-bg-on .site-header {
   background: rgba(15, 20, 28, .5);
-  border-bottom-color: rgba(255, 255, .08);
+  border-bottom-color: rgba(255, 255, 255, .08);
 }
 
 .header-inner {
